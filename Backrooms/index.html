@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Backrooms</title>
+<style>
+html,body{margin:0;height:100%;background:#000;color:#eee;font-family:system-ui,sans-serif;overflow:hidden}
+canvas{display:block;filter:saturate(.95) contrast(.92)}
+.ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10}
+.box{background:#1b1a14;border:1px solid #5a5230;padding:24px;min-width:300px;max-width:90vw;border-radius:8px}
+.box h1{margin:0 0 12px;color:#e8d77a;letter-spacing:3px}
+input,button{font:inherit;padding:8px 10px;margin:4px 0;border-radius:4px;border:1px solid #5a5230;background:#2a281d;color:#eee}
+button{cursor:pointer;background:#6b5d22}
+button:hover{background:#8a7a2e}
+#hud{position:fixed;left:16px;bottom:16px;z-index:5;text-shadow:0 0 4px #000;font-size:15px;pointer-events:none;line-height:1.5}
+#center{position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:5;text-align:center;pointer-events:none;text-shadow:0 0 4px #000}
+#toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:5;font-size:22px;color:#e8d77a;text-shadow:0 0 6px #000;pointer-events:none}
+.bar{width:220px;height:8px;background:#0008;border:1px solid #fff4;margin:4px auto 0}
+.bar>i{display:block;height:100%;background:#e8d77a}
+.panel{background:linear-gradient(180deg,rgba(28,24,12,.72),rgba(12,10,5,.72));border:1px solid rgba(232,215,122,.22);border-radius:12px;padding:10px 14px 12px;min-width:250px;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.panel .ttl{font-weight:700;letter-spacing:.5px}
+.panel .sub{font-size:12.5px;opacity:.8;margin-top:2px}
+.meter{display:flex;align-items:center;gap:9px;margin-top:8px}
+.meter svg{flex:none}
+.meter .pct{width:36px;text-align:right;font-size:12px;opacity:.85;font-variant-numeric:tabular-nums}
+.track{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.track>i{display:block;height:100%;border-radius:6px;transition:width .12s linear}
+.track.low{animation:blink .6s steps(2) infinite}
+@keyframes blink{50%{box-shadow:0 0 0 2px #e0533f}}
+.hint{display:inline-block;margin-top:8px;font-size:12px;opacity:.75}
+.key{display:inline-block;min-width:16px;padding:0 5px;border:1px solid #fff6;border-radius:4px;font-size:11px;line-height:16px;text-align:center;background:#0006}
+#invGrid{display:grid;grid-template-columns:repeat(3,84px);gap:10px;margin-top:6px}
+.slot{height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#2a281d;border:1px solid #5a5230;border-radius:8px;color:#eee;font-size:13px;margin:0}
+.slot:hover{background:#3a3624;border-color:#9fe08f}
+.slot.empty{background:#16150f;cursor:default}
+#osd{position:fixed;inset:0;pointer-events:none;z-index:4;font-family:'VT323',monospace;color:#f2f2e8;font-size:30px;line-height:1;text-shadow:2px 0 #f003,-2px 0 #0ff3,0 0 6px #fff6}
+#osd .tl{position:absolute;left:5%;top:6%}
+#osd .br{position:absolute;right:5%;bottom:7%;text-align:right}
+#gear{position:fixed;top:16px;right:16px;z-index:12;display:flex;align-items:center;gap:8px;padding:10px 18px 10px 14px;font-size:18px;font-weight:700;
+  border-radius:28px;background:#2a2615ee;border:2px solid #e8d77a;color:#e8d77a;box-shadow:0 0 18px rgba(232,215,122,.35)}
+#gear span{font-size:30px;line-height:1}
+#gear:hover{background:#3a3420}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:8px 0;font-size:14px}
+.srow input{width:160px;accent-color:#e8d77a}
+.kbrow{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px;padding:2px 0}
+.kbrow button{min-width:96px;margin:2px 0;font-size:13px;padding:5px 8px;background:#2a281d}
+.sc{position:relative;width:280px;height:14px;background:#000a;border:1px solid #fff6;margin:6px auto}
+.sc>b{position:absolute;top:0;bottom:0;background:#ffe9a0cc}
+.sc>i{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1px;background:#ff3030}
+#grain{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.05;mix-blend-mode:overlay}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(ellipse at center,transparent 55%,rgba(30,25,10,.45))}
+#hurt{position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(ellipse at center,transparent 30%,rgba(160,0,0,.9));opacity:0;transition:opacity .6s}
+#cross{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#fff8;border-radius:50%;z-index:5;pointer-events:none}
+.hidden{display:none!important}
+li{margin:4px 0}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="lobby" class="ov"><div class="box">
+  <h1>BACKROOMS</h1>
+  <div id="join">
+    <input id="name" placeholder="Tên của bạn" maxlength="16"><br>
+    <button id="hostBtn">Tạo phòng</button>
+    <div><input id="code" placeholder="Mã phòng" maxlength="5" style="width:110px;text-transform:uppercase"> <button id="joinBtn">Vào phòng</button></div>
+    <button id="soloBtn" style="background:#2a281d">Chơi thử một mình (người sống sót)</button>
+    <button id="specBtn" style="background:#2a281d">Khám phá bản đồ (Spectator)</button>
+  </div>
+  <div id="room" class="hidden">
+    <p>Mã phòng: <b id="roomCode" style="font-size:22px;color:#e8d77a"></b></p>
+    <div id="invite" class="hidden" style="font-size:13px;margin:-6px 0 10px">
+      Gửi link này cho bạn bè: <input id="inviteLink" readonly style="width:100%;box-sizing:border-box;font-size:12px">
+      <button id="copyLink">Sao chép link mời</button>
+    </div>
+    <ul id="plist"></ul>
+    <p id="hostHint" class="hidden" style="font-size:13px;opacity:.7">Bấm vào tên để chọn người làm Entity (tối đa 5 người).</p>
+    <button id="startBtn" class="hidden">Bắt đầu</button>
+  </div>
+  <p id="msg" style="color:#f88"></p>
+  <p style="font-size:12px;opacity:.6;max-width:380px">Phím mặc định: WASD di chuyển · Chuột nhìn · Shift chạy · Giữ C cúi/bò qua khe tường · Giữ E sửa cầu dao / cứu đồng đội (Space khi có skill check) · E nhặt Almond Water · Tab túi đồ · F đèn pin · Entity: click trái để tấn công. Đổi phím, âm lượng, độ nhạy chuột ở nút ⚙ góc trên bên phải.</p>
+</div></div>
+<div id="endOv" class="ov hidden"><div class="box"><h1 id="endTitle"></h1><div id="endBody"></div><button id="againBtn" class="hidden">Ván mới</button><p id="endWait" style="font-size:13px;opacity:.7"></p></div></div>
+<div id="inv" class="ov hidden" style="background:rgba(0,0,0,.55)"><div class="box">
+  <h1 style="font-size:20px">TÚI ĐỒ</h1>
+  <div id="invGrid"></div>
+  <p style="font-size:12px;opacity:.65;margin:10px 0 0">Click vào chai để uống Almond Water (+50%) · Tab để đóng, rồi click vào màn hình để chơi tiếp</p>
+  <button id="invClose">Đóng</button>
+</div></div>
+<button id="gear" title="Cài đặt" aria-label="Cài đặt"><span>⚙</span> Cài đặt</button>
+<div id="set" class="ov hidden" style="z-index:13"><div class="box" style="min-width:360px;max-height:90vh;overflow:auto">
+  <h1 style="font-size:20px">CÀI ĐẶT</h1>
+  <label class="srow">Âm lượng tổng <input type="range" id="sVol" min="0" max="100"></label>
+  <label class="srow">Độ nhạy chuột <input type="range" id="sSens" min="20" max="300"></label>
+  <label class="srow">Hiệu ứng băng VHS (tắt nếu máy bị giật) <input type="checkbox" id="sVhs" style="width:20px;height:20px;accent-color:#e8d77a"></label>
+  <h3 style="margin:14px 0 6px;font-size:15px;color:#e8d77a">Phím điều khiển <span style="font-weight:400;font-size:12px;opacity:.6">(bấm vào phím để đổi, Esc để hủy)</span></h3>
+  <div id="kbList"></div>
+  <div style="margin-top:12px"><button id="kbReset" style="background:#2a281d">Phím mặc định</button> <button id="setClose">Đóng</button></div>
+</div></div>
+<div id="osd" class="hidden"><div class="tl">▶ PLAY<br><span style="font-size:22px">SP</span></div><div class="br">MAY 12 1996<br><span id="osdTime"></span></div></div>
+<div id="grain"></div><div id="vig"></div><div id="hurt"></div><div id="cross"></div>
+<div id="hud"></div><div id="center"></div><div id="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Peer } from 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm';
+
+const $ = id => document.getElementById(id);
+const C = 2, WH = 3.4, N = 52, NTASK = 7, NEED = 5, TASK_TIME = 20, FREE_TIME = 4, BLEED = 60, MAXP = 5;
+const CRAWL_H = 1.05, NWATER = 30, WATER_LIFE = 210; // crawl gap height (m), almond water bottles on the map, seconds a full meter lasts
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); // player names are untrusted
+
+// ---------- map (deterministic from seed, so only the seed goes over the network) ----------
+function rng(s){return()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function genMap(seed){
+  const r=rng(seed),ri=(a,b)=>a+Math.floor(r()*(b-a+1));
+  const h=[...Array(N+1)].map((_,j)=>Array(N).fill(j===0||j===N)); // h[j][i]: wall on z=j*C, x in [i*C,(i+1)*C]
+  const v=[...Array(N)].map(()=>[...Array(N+1)].map((_,i)=>i===0||i===N)); // v[j][i]: wall on x=i*C, z in [j*C,(j+1)*C]
+  const extra=[];
+  // a straight wall `len` cells long with 1+ doorways (2-4m) roughly every `every` cells
+  const wall=(horiz,at,from,len,every)=>{const gap=new Set();
+    for(let k=0,n=Math.max(1,Math.round(len/every));k<n;k++){const dw=Math.min(len,ri(1,2)),s=ri(0,len-dw);for(let q=s;q<s+dw;q++)gap.add(q)}
+    for(let q=0;q<len;q++)if(!gap.has(q)){if(horiz)h[at][from+q]=true;else v[from+q][at]=true}};
+  const hall=(x,y,w,d)=>{const st=ri(2,3),s=.6+r()*.5;for(let j=y+st;j<y+d;j+=st)for(let i=x+st;i<x+w;i+=st)extra.push([i*C,j*C,s,s])};
+  // BSP: keep cutting the region with doored walls; every cut has a door so everything stays connected
+  const split=(x,y,w,d,dep)=>{
+    if(w>=8&&d>=8&&w*d<=400&&r()<.2)return hall(x,y,w,d); // cap: a hall must never swallow the whole map
+    const cx=w>=6,cz=d>=6;
+    if((!cx&&!cz)||dep>12||(dep>2&&w*d<=ri(12,48)))return;
+    const vert=cx&&(!cz||r()<(w>d?.75:.25)); // vertical wall (x = const) cuts the width
+    const L=vert?w:d,o=vert?x:y,len=vert?d:w,from=vert?y:x;
+    const rec=(a,b)=>vert?split(a,y,b-a,d,dep+1):split(x,a,w,b-a,dep+1);
+    if(L>=9&&len>=8&&r()<.3){ // narrow corridor (2-4m) between two parallel walls, doors along both sides
+      const cw=ri(1,2),p=o+ri(3,L-3-cw);wall(!vert,p,from,len,6);wall(!vert,p+cw,from,len,6);rec(o,p);rec(p+cw,o+L);return;
+    }
+    const p=o+ri(2,L-2);wall(!vert,p,from,len,10);rec(o,p);rec(p,o+L);
+  };
+  split(0,0,N,N,0);
+  // safety net: flood from (0,0) and knock through until every cell is reachable
+  const open=(i,j,a,b)=>a>i?!v[j][a]:a<i?!v[j][i]:b>j?!h[b][i]:!h[j][i];
+  const flood=()=>{const s=new Set(['0,0']),q=[[0,0]];while(q.length){const [i,j]=q.pop();
+    for(const [a,b] of [[i+1,j],[i-1,j],[i,j+1],[i,j-1]])if(a>=0&&b>=0&&a<N&&b<N&&!s.has(a+','+b)&&open(i,j,a,b)){s.add(a+','+b);q.push([a,b])}}return s};
+  for(let s=flood();s.size<N*N;s=flood())hole:for(const key of s){const [i,j]=key.split(',').map(Number);
+    for(const [a,b] of [[i+1,j],[i-1,j],[i,j+1],[i,j-1]])if(a>=0&&b>=0&&a<N&&b<N&&!s.has(a+','+b)){if(a!==i)v[j][Math.max(i,a)]=false;else h[Math.max(j,b)][i]=false;break hole}}
+  for(let j=1;j<N;j++)for(let i=1;i<N;i++)if(!(h[j][i-1]||h[j][i]||v[j-1][i]||v[j][i])&&r()<.03)extra.push([i*C,j*C,.9,.9]); // rare lone pillar
+  // crawl gaps: a low opening under a wall; crouching survivors fit, the tall entity does not.
+  // a gap must sit mid-run (solid wall both sides, so it reads as a gap under one wall) and be a real
+  // shortcut: without it the walk around is > 14 cells (28m). Only solid wall is converted, so the
+  // killer keeps the connectivity guaranteed above.
+  const within=(ai,aj,bi,bj,maxd)=>{let fr=[[ai,aj]];const s=new Set([ai+','+aj]);
+    for(let d=0;d<maxd;d++){const nx=[];for(const [i,j] of fr)for(const [x,y] of [[i+1,j],[i-1,j],[i,j+1],[i,j-1]])
+      if(x>=0&&y>=0&&x<N&&y<N&&!s.has(x+','+y)&&open(i,j,x,y)){if(x===bi&&y===bj)return true;s.add(x+','+y);nx.push([x,y])}fr=nx}return false};
+  const crawl=[],cset=new Set();
+  for(let tries=0;tries<1500&&crawl.length<40;tries++){
+    const hz=r()<.5,i=ri(1,N-2),j=ri(1,N-2),key=hz+','+i+','+j;
+    const solid=hz?h[j][i]&&h[j][i-1]&&h[j][i+1]&&!cset.has(true+','+(i-1)+','+j)&&!cset.has(true+','+(i+1)+','+j)
+                  :v[j][i]&&v[j-1][i]&&v[j+1][i]&&!cset.has(false+','+i+','+(j-1))&&!cset.has(false+','+i+','+(j+1));
+    if(!solid||cset.has(key)||(hz?within(i,j-1,i,j,14):within(i-1,j,i,j,14)))continue;
+    cset.add(key);crawl.push([hz?1:0,j,i]);
+  }
+  for(const [hz,j,i] of crawl)if(hz)h[j][i]=false;else v[j][i]=false;
+  const ctr=(i,j)=>[(i+.5)*C,(j+.5)*C], cells=[];
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++)cells.push([i,j]);
+  const waters=[...Array(NWATER)].map(()=>ctr(ri(0,N-1),ri(0,N-1)));
+  // breaker boxes stand flush against a wall (north side of the cell), so they never block a 2m corridor
+  const far=cells.filter(([i,j])=>j>0&&j<N-1&&h[j][i]&&Math.abs(i-N/2)+Math.abs(j-N/2)>8), tasks=[];
+  if(far.length<NTASK)far.push(...cells.filter(([i,j])=>j>0&&h[j][i]&&!far.includes(cells[j*N+i])));
+  while(tasks.length<NTASK){const [i,j]=far.splice(Math.floor(r()*far.length),1)[0];tasks.push([(i+.5)*C,j*C+.32])}
+  const reds=[...Array(3)].map(()=>{const w=ri(4,8);return [ri(0,N-w),ri(0,N-w),w]});
+  return {h,v,exitI:Math.floor(r()*N),killerSpawn:ctr(N>>1,N>>1),
+    survSpawn:[ctr(0,N-1),ctr(1,N-1),ctr(N-1,N-1),ctr(N-2,N-1)],tasks,extra,reds,crawl,waters,
+    // one fixture slot per 4x4m, about a third of them dead: darker gaps between pools of light
+    lights:cells.filter(([i,j])=>i%2===0&&j%2===0).map(([i,j])=>({p:ctr(i,j),on:r()>.35,flick:r()<.06,red:reds.some(([a,b,w])=>i>=a&&i<a+w&&j>=b&&j<b+w)}))};
+}
+function spawns(M,roles){let si=0;const o={};for(const id of Object.keys(roles))o[id]=roles[id]==='killer'?M.killerSpawn:M.survSpawn[si++%4];return o}
+function makeRects(M){
+  const R=[],t=.12;
+  for(let j=0;j<=N;j++)for(let i=0;i<N;i++)if(M.h[j][i])R.push({x0:i*C-t,x1:(i+1)*C+t,z0:j*C-t,z1:j*C+t,door:j===0&&i===M.exitI});
+  for(let j=0;j<N;j++)for(let i=0;i<=N;i++)if(M.v[j][i])R.push({x0:i*C-t,x1:i*C+t,z0:j*C-t,z1:(j+1)*C+t});
+  for(const [x,z] of M.tasks)R.push({x0:x-.45,x1:x+.45,z0:z-.2,z1:z+.2});
+  for(const [x,z,w,d] of M.extra)R.push({x0:x-w/2,x1:x+w/2,z0:z-d/2,z1:z+d/2});
+  for(const [hz,j,i] of M.crawl)R.push(hz?{x0:i*C-t,x1:(i+1)*C+t,z0:j*C-t,z1:j*C+t,crawl:1}:{x0:i*C-t,x1:i*C+t,z0:j*C-t,z1:(j+1)*C+t,crawl:1});
+  return R;
+}
+// line of sight in 2D (slab test): does the segment a->b pass through any wall, pillar or cabinet?
+function blocked(ax,az,bx,bz){
+  const dx=bx-ax,dz=bz-az;
+  for(const b of RECTS){
+    if(b.door&&G.exitOpen)continue;
+    let t0=0,t1=1;
+    for(const [p,d,lo,hi] of [[ax,dx,b.x0,b.x1],[az,dz,b.z0,b.z1]]){
+      if(Math.abs(d)<1e-9){if(p<lo||p>hi){t0=2;break}continue}
+      let u=(lo-p)/d,w=(hi-p)/d;if(u>w)[u,w]=[w,u];t0=Math.max(t0,u);t1=Math.min(t1,w);if(t0>t1)break;
+    }
+    if(t0<=t1)return true;
+  }
+  return false;
+}
+const touches=(b,p,rad)=>Math.hypot(p.x-Math.max(b.x0,Math.min(p.x,b.x1)),p.z-Math.max(b.z0,Math.min(p.z,b.z1)))<rad;
+function collide(p,rad){
+  for(const b of RECTS){
+    if(b.door&&G.exitOpen||b.crawl&&p.crouch)continue;
+    const cx=Math.max(b.x0,Math.min(p.x,b.x1)),cz=Math.max(b.z0,Math.min(p.z,b.z1));
+    const dx=p.x-cx,dz=p.z-cz,d=Math.hypot(dx,dz);
+    if(d>=rad)continue;
+    if(d>1e-6){p.x=cx+dx/d*rad;p.z=cz+dz/d*rad;continue}
+    const m=Math.min(p.x-b.x0,b.x1-p.x,p.z-b.z0,b.z1-p.z);
+    if(m===p.x-b.x0)p.x=b.x0-rad;else if(m===b.x1-p.x)p.x=b.x1+rad;else if(m===p.z-b.z0)p.z=b.z0-rad;else p.z=b.z1+rad;
+  }
+}
+
+// ---------- procedural textures ----------
+function tex(draw,w=512,h=512){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t}
+function noise(g,amt){const d=g.getImageData(0,0,512,512),a=d.data;for(let i=0;i<a.length;i+=4){const n=(Math.random()-.5)*amt;a[i]+=n;a[i+1]+=n;a[i+2]+=n}g.putImageData(d,0,0)}
+function stains(g,n,col){for(let k=0;k<n;k++){const x=Math.random()*512,y=Math.random()*512,r=20+Math.random()*90,gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r)}}
+// low-frequency blotches: a tiny random canvas scaled up smooth = uneven, faded coloration
+function blotch(g,cells,alpha,light,dark){const c=document.createElement('canvas');c.width=c.height=cells;const b=c.getContext('2d');
+  for(let y=0;y<cells;y++)for(let x=0;x<cells;x++){b.fillStyle=Math.random()<.5?light:dark;b.globalAlpha=Math.random();b.fillRect(x,y,1,1)}
+  g.save();g.globalAlpha=alpha;g.imageSmoothingEnabled=true;g.drawImage(c,0,0,512,512);g.restore()}
+const wallTex=tex(g=>{
+  g.fillStyle='#b8a35d';g.fillRect(0,0,512,512);
+  blotch(g,6,.15,'#c4af68','#a8934f');
+  for(const [col,dy] of [['rgba(85,70,30,.13)',0],['rgba(235,220,160,.07)',2]]){g.strokeStyle=col;g.lineWidth=1; // fine chevron wallpaper
+    for(let y=0;y<512;y+=8)for(let x=0;x<512;x+=12){g.beginPath();g.moveTo(x,y+9+dy);g.lineTo(x+6,y+3+dy);g.lineTo(x+12,y+9+dy);g.stroke()}}
+  for(let x=0;x<512;x+=128){g.fillStyle='rgba(90,75,35,.18)';g.fillRect(x,0,1,512)} // wallpaper seams
+  stains(g,1,'rgba(110,90,40,.08)');
+  for(const [y0,y1,a] of [[0,40,.22],[440,500,.3]]){const gr=g.createLinearGradient(0,y0,0,y1); // fake AO at ceiling and floor
+    gr.addColorStop(y0?0:1,'rgba(70,60,30,0)');gr.addColorStop(y0?1:0,`rgba(70,60,30,${a})`);g.fillStyle=gr;g.fillRect(0,y0,512,y1-y0)}
+  g.fillStyle='#a89863';g.fillRect(0,500,512,12); // plain baseboard
+  noise(g,10);
+});
+wallTex.repeat.set(1,1);
+const S=N*C+8, mid=N*C/2;
+const carpetTex=tex(g=>{
+  g.fillStyle='#ad9549';g.fillRect(0,0,512,512);
+  blotch(g,10,.2,'#b9a057','#8f7836');
+  const d=g.getImageData(0,0,512,512),a=d.data; // dense short fibers: per-pixel noise
+  for(let i=0;i<a.length;i+=4){const n=(Math.random()-.55)*40;a[i]+=n;a[i+1]+=n*.95;a[i+2]+=n*.85}g.putImageData(d,0,0);
+  stains(g,2,'rgba(90,75,40,.1)');
+});carpetTex.repeat.set(S/3,S/3);
+const ceilTex=tex(g=>{
+  for(const [x,y] of [[0,0],[256,0],[0,256],[256,256]]){const v=Math.random()*8|0;g.fillStyle=`rgb(${190-v},${168-v},${112-v})`;g.fillRect(x,y,256,256)} // tan tiles, each slightly different
+  for(let k=0;k<2000;k++){g.fillStyle=`rgba(80,65,30,${Math.random()*.25})`;g.fillRect(Math.random()*512,Math.random()*512,2,2)} // acoustic pocks
+  g.fillStyle='#8f7c48';for(let k=0;k<=512;k+=256){g.fillRect(k-3,0,6,512);g.fillRect(0,k-3,512,6)} // T-bar grid
+  noise(g,8);
+});ceilTex.repeat.set(S/2,S/2);
+// louvered fixture: dark housing with bright slats, like the reference photo
+const fixTex=tex(g=>{g.fillStyle='#4a4436';g.fillRect(0,0,128,256);g.fillStyle='#fffdf2';
+  for(let k=0;k<5;k++)g.fillRect(16,18+k*46,96,22)},128,256);
+const exitTex=tex(g=>{g.fillStyle='#200';g.fillRect(0,0,256,96);g.fillStyle='#ff3020';g.font='bold 64px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('EXIT',128,50)},256,96);
+
+// real photo-scanned PBR textures (ambientCG, CC0) in textures/. The colour photo goes underneath and the
+// procedural layer above is multiplied over it (yellow tint, wallpaper pattern, dirt). Normal + roughness
+// maps give real surface relief. Needs the textures/ folder served next to index.html.
+const texLoader=new THREE.TextureLoader();
+function photo(tex,name,tint,rep){
+  const img=new Image();
+  img.onload=()=>{
+    const c=tex.image,g=c.getContext('2d');c.width=c.height=1024;g.drawImage(img,0,0,1024,1024);
+    const t=document.createElement('canvas');t.width=t.height=512;tint(t.getContext('2d'));
+    g.globalCompositeOperation='multiply';g.drawImage(t,0,0,1024,1024);g.globalCompositeOperation='source-over';
+    tex.repeat.copy(rep);tex.needsUpdate=true;
+  };
+  img.src=`textures/${name}_color.jpg`;
+  return ['normal','rough'].map(k=>{const t=texLoader.load(`textures/${name}_${k}.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.copy(rep);t.anisotropy=8;return t});
+}
+const [wallNor,wallRough]=photo(wallTex,'wall',g=>{ // woodchip photo + the yellow chevron wallpaper on top
+  g.fillStyle='#d2ba6a';g.fillRect(0,0,512,512);blotch(g,6,.18,'#dcc678','#b8a35d'); // wall photo averages ~88% white
+  g.strokeStyle='rgba(85,70,30,.16)';g.lineWidth=1;
+  for(let y=0;y<512;y+=8)for(let x=0;x<512;x+=12){g.beginPath();g.moveTo(x,y+9);g.lineTo(x+6,y+3);g.lineTo(x+12,y+9);g.stroke()}
+  for(let x=0;x<512;x+=128){g.fillStyle='rgba(90,75,35,.2)';g.fillRect(x,0,1,512)}
+  for(const [y0,y1,a] of [[0,40,.25],[440,500,.35]]){const gr=g.createLinearGradient(0,y0,0,y1);
+    gr.addColorStop(y0?0:1,'rgba(70,60,30,0)');gr.addColorStop(y0?1:0,`rgba(70,60,30,${a})`);g.fillStyle=gr;g.fillRect(0,y0,512,y1-y0)}
+  g.fillStyle='#8f7f4f';g.fillRect(0,500,512,12);stains(g,1,'rgba(110,90,40,.1)');
+},new THREE.Vector2(1,1));
+// tints = original procedural colour / photo average colour, so photo x tint lands back on the old palette
+// (carpet photo averages rgb(188,176,148) -> tint #ebd87e gives the old #ad9549 yellow-brown, not muddy brown)
+const [carpetNor,carpetRough]=photo(carpetTex,'carpet',g=>{g.fillStyle='#ebd87e';g.fillRect(0,0,512,512);blotch(g,8,.2,'#f4e28c','#cdb46a');stains(g,2,'rgba(120,100,50,.15)')},new THREE.Vector2(S/2,S/2));
+// photo has 6x6 tiles; repeat S/6 keeps 1m tiles on the same grid the light fixtures snap to
+const [ceilNor,ceilRough]=photo(ceilTex,'ceiling',g=>{g.fillStyle='#c9b57e';g.fillRect(0,0,512,512);blotch(g,6,.25,'#d6c38b','#a8935a');stains(g,2,'rgba(140,115,55,.25)')},new THREE.Vector2(S/6,S/6));
+
+// ---------- renderer / scene ----------
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+// pale yellow haze instead of darkness: distance fades into dusty air, not into black
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0b0904);scene.fog=new THREE.FogExp2(0x0b0904,.07);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,80);camera.rotation.order='YXZ';scene.add(camera);
+// ---------- VHS / camcorder post-processing (found-footage look) ----------
+// order: scene -> tone mapping + sRGB (OutputPass) -> VHS pass, so the tape effects work on display colours
+const VHS={
+  uniforms:{tDiffuse:{value:null},time:{value:0},res:{value:new THREE.Vector2(innerWidth,innerHeight)}},
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:`uniform sampler2D tDiffuse;uniform float time;uniform vec2 res;varying vec2 vUv;
+  const vec3 W=vec3(.299,.587,.114);
+  float rnd(vec2 c){return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);}
+  float vn(float x){float i=floor(x);return mix(rnd(vec2(i,0.)),rnd(vec2(i+1.,0.)),smoothstep(0.,1.,fract(x)));}
+  vec3 tap(vec2 p){return texture2D(tDiffuse,p).rgb;}
+  void main(){
+    vec2 cc=vUv-.5;float r2=dot(cc,cc);vec2 uv=.5+cc*(1.+.05*r2);                       // slight lens/CRT barrel
+    uv.y+=step(.97,rnd(vec2(floor(time*4.),7.)))*(rnd(vec2(floor(time*24.),1.))-.5)*.006; // occasional vertical frame jitter
+    uv.x+=(vn(uv.y*8.+time*2.)-.5)*.0025;                                                // tape stretch: lines waver together
+    float band=step(.993,rnd(vec2(floor(time*6.),floor(uv.y*30.))));                    // rare tracking tears
+    uv.x+=band*.012*(rnd(vec2(time,uv.y))-.5);
+    float hs=smoothstep(.05,.0,uv.y);                                                    // head-switching noise along the bottom edge
+    uv.x+=hs*(.015+.03*rnd(vec2(floor(time*30.),floor(uv.y*200.))));
+    float px=1./res.x;                                                                   // VHS is soft: ~240 lines of luma resolution
+    vec3 soft=tap(uv)*.36+(tap(uv+vec2(px*1.5,0.))+tap(uv-vec2(px*1.5,0.)))*.22+(tap(uv+vec2(px*3.,0.))+tap(uv-vec2(px*3.,0.)))*.1;
+    float ca=.0015+.005*r2;                                                              // colour is even softer and lags to the right
+    vec3 cr=vec3(tap(uv+vec2(ca+.002,0.)).r,tap(uv+vec2(.002,0.)).g,tap(uv-vec2(ca-.002,0.)).b);
+    vec3 cb=(tap(uv+vec2(.006,0.))+tap(uv-vec2(.002,0.))+cr)/3.;
+    float l=dot(soft,W);vec3 col=l+(cb-dot(cb,W));
+    col+=(l-dot(tap(uv+vec2(px*4.,0.)),W))*.25;                                          // edge-enhancement halo of old decks
+    col+=dot(tap(uv-vec2(.012,0.)),W)*.06;                                               // faint ghost image
+    col*=.94+.06*sin(uv.y*res.y*3.14159);                                                // scanlines
+    col+=(rnd(uv*res+fract(time)*100.)-.5)*.075;                                         // tape grain
+    col+=step(.9985,rnd(vec2(floor(uv.y*res.y*.5),floor(time*24.))))*rnd(vec2(uv.x*3.,time))*.35; // white dropout streaks
+    col+=band*.08+hs*(rnd(uv*res+time)-.3)*.4;
+    col*=1.+(vn(time*9.)-.5)*.04;                                                        // brightness flicker
+    col=mix(vec3(dot(col,W)),col,.93)*.95+.02;                                           // a bit washed out, blacks lifted slightly
+    col*=1.-r2*1.1;                                                                      // vignette
+    if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)col=vec3(0.);
+    gl_FragColor=vec4(col,1.);
+  }`
+};
+const composer=new EffectComposer(renderer),vhsPass=new ShaderPass(VHS);
+composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());composer.addPass(vhsPass);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+  composer.setSize(innerWidth,innerHeight);vhsPass.uniforms.res.value.set(innerWidth,innerHeight)});
+// dark level: near-zero ambient (set per role in startGame), small baked pools under every fixture,
+// plus real lights on the fixtures nearest you so walls light up too; fog hides the swap at distance
+const hemi=new THREE.HemisphereLight(0xffefc0,0x7a6a3a,.1);scene.add(hemi);
+const pool=[...Array(8)].map(()=>{const l=new THREE.PointLight(0xfff0c8,0,3.5,2);scene.add(l);return l});
+const flash=new THREE.SpotLight(0xffd9a0,0,26,.5,.45,1.4); // warm incandescent beam, not LED white
+flash.castShadow=true;flash.shadow.mapSize.set(1024,1024);flash.shadow.camera.near=.1;
+// held at the hip, aimed so the beam converges on the crosshair
+flash.position.set(.12,-.12,0);flash.target.position.set(0,0,-8);camera.add(flash,flash.target);
+// a little self-illumination keeps walls evenly lit like fluorescent bounce light (walls have no lightmap)
+const wallMat=new THREE.MeshStandardMaterial({map:wallTex,normalMap:wallNor,roughnessMap:wallRough,roughness:1,emissive:0xffffff,emissiveMap:wallTex,emissiveIntensity:.02});
+const floorMat=new THREE.MeshStandardMaterial({map:carpetTex,normalMap:carpetNor,roughnessMap:carpetRough,roughness:1});
+const ceilMat=new THREE.MeshStandardMaterial({map:ceilTex,normalMap:ceilNor,roughnessMap:ceilRough,roughness:1,emissive:0xffffff,emissiveMap:ceilTex,emissiveIntensity:.02});
+const fixMat=new THREE.MeshBasicMaterial({map:fixTex});
+const WHITE=new THREE.Color(0xfffbe8),RED=new THREE.Color(0xff2a18),OFF=new THREE.Color(0x5a5446),tmpC=new THREE.Color();
+const fixColor=(f,lvl)=>tmpC.copy(f.on||f.flick?f.red?RED:WHITE:OFF).multiplyScalar(f.on||f.flick?lvl:1);
+let fixMesh,redLights=[];
+// one canvas painted with a glow under every fixture, used as the floor/ceiling lightMap
+function bakeLight(M){
+  const P=1024,k=P/S,o=mid-S/2,c=document.createElement('canvas');c.width=c.height=P;const g=c.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,P,P);g.globalCompositeOperation='lighter';
+  for(const L of M.lights){if(!L.on&&!L.flick)continue;const x=(L.p[0]+.5-o)*k,y=(L.p[1]-o)*k,r=(L.red?4:2.6)*k,gr=g.createRadialGradient(x,y,0,x,y,r);
+    gr.addColorStop(0,L.red?'rgba(255,30,15,.9)':'rgba(255,232,180,.85)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r)}
+  const floor=new THREE.CanvasTexture(c),ceil=floor.clone();floor.channel=ceil.channel=0;
+  ceil.repeat.set(1,-1);ceil.offset.set(0,1); // the ceiling plane is flipped in z
+  return [floor,ceil];
+}
+const extraGeo=new THREE.BoxGeometry(1,WH,1);
+const cabMat=new THREE.MeshStandardMaterial({color:0x5d6166,metalness:.5,roughness:.55});
+let world,door,glow,taskLamps=[],fixtures=[],RECTS=[],waterMeshes=[];
+// almond water: a milky bottle with a blue cap, faintly glowing so a flashlight sweep can find it
+const bottleGeo=new THREE.CylinderGeometry(.045,.05,.22,12),capGeo=new THREE.CylinderGeometry(.025,.025,.04,10);
+const bottleMat=new THREE.MeshStandardMaterial({color:0xf0e6cf,emissive:0xfff2d0,emissiveIntensity:.25,roughness:.3,transparent:true,opacity:.9});
+const capMat=new THREE.MeshStandardMaterial({color:0x2d5fa8,roughness:.5});
+// red beam the entity sees through walls for a moment when a survivor botches a skill check
+const alarmMark=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,40,8),new THREE.MeshBasicMaterial({color:0xff2020,transparent:true,opacity:.6,depthTest:false,fog:false}));
+alarmMark.renderOrder=999;alarmMark.visible=false;scene.add(alarmMark);
+const dust=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([...Array(1200)].map((_,i)=>i%3===1?Math.random()*WH:(Math.random()-.5)*12+mid),3)),
+  new THREE.PointsMaterial({color:0xfff4d0,size:.012,transparent:true,opacity:.5,depthWrite:false}));scene.add(dust);
+
+function buildWorld(M){
+  if(world)scene.remove(world);world=new THREE.Group();scene.add(world);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(S,S),floorMat);floor.rotation.x=-Math.PI/2;floor.position.set(mid,0,mid);floor.receiveShadow=true;
+  const ceil=new THREE.Mesh(new THREE.PlaneGeometry(S,S),ceilMat);ceil.rotation.x=Math.PI/2;ceil.position.set(mid,WH,mid);
+  world.add(floor,ceil);
+  const [lmF,lmC]=bakeLight(M);
+  for(const [m,t,s] of [[floorMat,lmF,.9],[ceilMat,lmC,.9]]){m.lightMap?.dispose();m.lightMap=t;m.lightMapIntensity=s;m.needsUpdate=true}
+  // red zones also get a real light so the walls turn red, not just the floor
+  for(const l of redLights)scene.remove(l);
+  redLights=M.reds.map(([i,j,w])=>{const l=new THREE.PointLight(0xff2a18,8,w*C*1.2,1.5);l.position.set((i+w/2)*C,WH-.5,(j+w/2)*C);scene.add(l);return l});
+  const segs=[];
+  for(let j=0;j<=N;j++)for(let i=0;i<N;i++)if(M.h[j][i]&&!(j===0&&i===M.exitI))segs.push([(i+.5)*C,j*C,0]);
+  for(let j=0;j<N;j++)for(let i=0;i<=N;i++)if(M.v[j][i])segs.push([i*C,(j+.5)*C,Math.PI/2]);
+  const walls=new THREE.InstancedMesh(new THREE.BoxGeometry(C+.24,WH,.24),wallMat,segs.length),o=new THREE.Object3D();
+  segs.forEach(([x,z,r],k)=>{o.position.set(x,WH/2,z);o.rotation.y=r;o.updateMatrix();walls.setMatrixAt(k,o.matrix)});
+  walls.castShadow=walls.receiveShadow=true;world.add(walls);
+  if(M.extra.length){const ex=new THREE.InstancedMesh(extraGeo,wallMat,M.extra.length);
+    M.extra.forEach(([x,z,w,d],k)=>{o.position.set(x,WH/2,z);o.rotation.y=0;o.scale.set(w,1,d);o.updateMatrix();ex.setMatrixAt(k,o.matrix)});
+    o.scale.set(1,1,1);ex.castShadow=ex.receiveShadow=true;world.add(ex)}
+  if(M.crawl.length){const cw=new THREE.InstancedMesh(new THREE.BoxGeometry(C+.24,WH-CRAWL_H,.24),wallMat,M.crawl.length); // wall with a low gap underneath
+    M.crawl.forEach(([hz,j,i],k)=>{o.position.set(hz?(i+.5)*C:i*C,CRAWL_H+(WH-CRAWL_H)/2,hz?j*C:(j+.5)*C);o.rotation.set(0,hz?0:Math.PI/2,0);o.updateMatrix();cw.setMatrixAt(k,o.matrix)});
+    cw.castShadow=cw.receiveShadow=true;world.add(cw)}
+  waterMeshes=M.waters.map(([x,z])=>{const g=new THREE.Group(),b=new THREE.Mesh(bottleGeo,bottleMat),c=new THREE.Mesh(capGeo,capMat);
+    b.position.y=.11;c.position.y=.24;b.castShadow=true;g.add(b,c);g.position.set(x,0,z);world.add(g);return g});
+  const ex=(M.exitI+.5)*C;
+  door=new THREE.Mesh(new THREE.BoxGeometry(C,WH,.2),new THREE.MeshStandardMaterial({color:0x55585c,metalness:.6,roughness:.5}));door.position.set(ex,WH/2,0);door.castShadow=true;
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(.8,.3),new THREE.MeshBasicMaterial({map:exitTex}));sign.position.set(ex,WH-.3,.2);
+  glow=new THREE.Mesh(new THREE.PlaneGeometry(C,WH),new THREE.MeshBasicMaterial({color:0xffffff,fog:false}));glow.position.set(ex,WH/2,-1.5);
+  world.add(door,sign,glow);
+  const cabGeo=new THREE.BoxGeometry(.9,1.4,.4),lampGeo=new THREE.SphereGeometry(.05,8,6);
+  taskLamps=M.tasks.map(([x,z])=>{
+    const b=new THREE.Mesh(cabGeo,cabMat);b.position.set(x,.7,z);b.castShadow=b.receiveShadow=true;world.add(b);
+    const lm=new THREE.MeshBasicMaterial({color:0xff2200});
+    for(const s of[1,-1]){const l=new THREE.Mesh(lampGeo,lm);l.position.set(x,1.25,z+s*.21);world.add(l)}
+    return lm;
+  });
+  const fixGeo=new THREE.PlaneGeometry(.96,1.96); // fills exactly 1x2 ceiling tiles
+  fixMesh=new THREE.InstancedMesh(fixGeo,fixMat,M.lights.length);
+  fixtures=M.lights.map((L,k)=>{
+    o.position.set(L.p[0]+.5,WH-.005,L.p[1]);o.rotation.set(Math.PI/2,0,0);o.updateMatrix();fixMesh.setMatrixAt(k,o.matrix);
+    const f={...L,lvl:1,tm:0,k};fixMesh.setColorAt(k,fixColor(f,1));return f;
+  });
+  world.add(fixMesh);
+}
+const COLS=[0x3a5a8c,0x8c3a3a,0x3a8c52,0x8c7a3a];
+function makeAvatar(role,col){
+  const g=new THREE.Group();
+  if(role==='killer'){
+    const m=new THREE.MeshStandardMaterial({color:0x080808,roughness:1}),em=new THREE.MeshBasicMaterial({color:0xffffff});
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(.16,.26,2.1,8),m);body.position.y=1.05;
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.2,12,10),m);head.position.y=2.3;head.scale.y=1.3;g.add(body,head);
+    for(const s of[-1,1]){
+      const e=new THREE.Mesh(new THREE.SphereGeometry(.03,6,6),em);e.position.set(s*.07,2.33,-.18);
+      const a=new THREE.Mesh(new THREE.CylinderGeometry(.04,.03,1.6,6),m);a.position.set(s*.3,1.25,0);a.rotation.z=s*.12;g.add(e,a);
+    }
+  }else{
+    const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,4,10),new THREE.MeshStandardMaterial({color:col,roughness:.8}));body.position.y=.68;
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.17,12,10),new THREE.MeshStandardMaterial({color:0xd8a888,roughness:.7}));head.position.y=1.5;
+    const sp=new THREE.SpotLight(0xffd9a0,0,18,.45,.5,1.5);sp.position.set(.2,1.35,-.3);sp.target.position.set(0,1,-3);
+    g.add(body,head,sp,sp.target);g.userData.spot=sp;
+  }
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  return g;
+}
+
+// ---------- shared client state ----------
+const G={phase:'lobby',me:null,isHost:false,M:null,roles:{},names:{},exitOpen:false,tasks:[],st:{},avatars:{}};
+const me={x:0,z:0,yaw:0,pitch:0,stam:1,fl:true,slow:0,cd:0,boost:0,bob:0,hb:0,holding:null,sentHold:null,esc:false,sendT:0,lastSt:'ok'};
+let peer,conn;const conns=new Map();let H=null;
+const send=m=>G.isHost?onHostMsg(G.me,m):conn?.open&&conn.send(m);
+function broadcast(m){for(const c of conns.values())if(c.open)c.send(m);onClientMsg(m)}
+
+// ---------- host (authoritative for tasks, hits, rescue, win) ----------
+function onHostMsg(id,m){
+  if(!m||typeof m!=='object')return;
+  if(m.t==='hello'){
+    if(H.play||H.players.size>=MAXP){conns.get(id)?.send({t:'full'});return}
+    H.players.set(id,{id,name:String(m.name||'?').slice(0,16)});if(!H.killer)H.killer=id;lobbyBroadcast();return;
+  }
+  const p=H.players.get(id);if(!p||!H.play)return;
+  if(m.t==='pos'){if(p.role==='killer'||p.st==='ok'||p.st==='hurt'){p.x=+m.x||0;p.z=+m.z||0;p.ry=+m.ry||0;p.pt=+m.pt||0;p.fl=m.fl?1:0;p.cr=m.cr?1:0}}
+  else if(m.t==='hold')p.hold=typeof m.k==='string'?m.k:null;
+  else if(m.t==='pick'){ // almond water: first valid claim wins, everyone hides it
+    const i=m.i|0,b=G.M.waters[i];
+    if(b&&!H.taken.has(i)&&p.role==='surv'&&(p.st==='ok'||p.st==='hurt')&&Math.hypot(b[0]-p.x,b[1]-p.z)<2&&!blocked(p.x,p.z,b[0],b[1])){H.taken.add(i);broadcast({t:'fx',k:'pick',i,id})}
+  }
+  else if(m.t==='fail'){ // botched skill check: lose progress and make noise the entity can locate
+    const i=m.i|0;
+    if(p.role==='surv'&&p.hold==='t:'+i&&H.tasks[i]<1){H.tasks[i]=Math.max(0,H.tasks[i]-.1);broadcast({t:'fx',k:'boom',i})}
+  }
+  else if(m.t==='hit'){
+    const v=H.players.get(m.id);
+    if(p.role!=='killer'||p.cd>0||!v||v.role!=='surv'||Math.hypot(v.x-p.x,v.z-p.z)>3||blocked(p.x,p.z,v.x,v.z))return;
+    if(v.st==='ok')v.st='hurt';else if(v.st==='hurt'){v.st='caught';v.caughtT=0;v.freeP=0;v.hold=null}else return;
+    p.cd=2;broadcast({t:'fx',k:'hit',id:m.id,st:v.st});
+  }
+  else if(m.t==='escape'){if(p.role==='surv'&&(p.st==='ok'||p.st==='hurt')&&H.exitOpen&&p.z<1){p.st='escaped';p.hold=null;broadcast({t:'fx',k:'esc',name:p.name})}}
+}
+function hostTick(){
+  if(!H?.play)return;const dt=1/15,all=[...H.players.values()];
+  for(const p of all){
+    p.cd=Math.max(0,p.cd-dt);
+    if(p.st==='caught'&&(p.caughtT+=dt)>BLEED)p.st='dead';
+    if(p.role!=='surv'||!(p.st==='ok'||p.st==='hurt')||!p.hold)continue;
+    const [k,ref]=p.hold.split(':');
+    if(k==='t'){const i=+ref,tk=G.M.tasks[i],f=tk&&taskFront(tk);
+      if(tk&&H.tasks[i]<1&&Math.hypot(f[0]-p.x,f[1]-p.z)<2.2&&!blocked(p.x,p.z,f[0],f[1]))H.tasks[i]=Math.min(1,H.tasks[i]+dt/TASK_TIME)}
+    else if(k==='p'){const v=H.players.get(ref);if(v&&v.st==='caught'&&Math.hypot(v.x-p.x,v.z-p.z)<2.5&&!blocked(p.x,p.z,v.x,v.z)&&(v.freeP+=dt/FREE_TIME)>=1){v.st='hurt';v.freeP=0}}
+  }
+  if(!H.exitOpen&&H.tasks.filter(x=>x>=1).length>=NEED){H.exitOpen=true;broadcast({t:'fx',k:'exit'})}
+  broadcast({t:'state',exit:H.exitOpen,tasks:H.tasks.map(x=>+x.toFixed(3)),
+    p:Object.fromEntries(all.map(p=>[p.id,{x:+p.x.toFixed(2),z:+p.z.toFixed(2),ry:+p.ry.toFixed(2),pt:+p.pt.toFixed(2),st:p.st,fl:p.fl,cr:p.cr,fp:+p.freeP.toFixed(2),ct:Math.ceil(BLEED-p.caughtT)}]))});
+  const surv=all.filter(p=>p.role==='surv');
+  if(surv.length&&!surv.some(p=>p.st==='ok'||p.st==='hurt')){
+    H.play=false;for(const p of surv)if(p.st==='caught')p.st='dead';
+    broadcast({t:'end',esc:surv.filter(p=>p.st==='escaped').map(p=>p.name),dead:surv.filter(p=>p.st==='dead').map(p=>p.name)});
+  }
+}
+function lobbyBroadcast(){broadcast({t:'lobby',list:[...H.players.values()].map(p=>({id:p.id,name:p.name})),killer:H.killer})}
+function hostStart(){
+  const seed=Math.random()*1e9|0,M=genMap(seed),roles={},names={};
+  for(const [id,p] of H.players){roles[id]=id===H.killer?'killer':'surv';names[id]=p.name}
+  const sp=spawns(M,roles);
+  for(const [id,p] of H.players)Object.assign(p,{role:roles[id],x:sp[id][0],z:sp[id][1],ry:0,pt:0,st:'ok',hold:null,cd:0,fl:1,cr:0,caughtT:0,freeP:0});
+  Object.assign(H,{play:true,exitOpen:false,tasks:Array(NTASK).fill(0),taken:new Set()});
+  broadcast({t:'start',seed,roles,names});
+}
+
+// ---------- client message handling ----------
+function onClientMsg(m){
+  if(!m||typeof m!=='object')return;
+  if(m.t==='lobby'){G.phase='lobby';$('lobby').classList.remove('hidden');$('endOv').classList.add('hidden');renderLobby(m.list||[],m.killer)}
+  else if(m.t==='start')startGame(m);
+  else if(m.t==='state'&&G.phase==='play'){
+    const nt=m.tasks||[];
+    nt.forEach((v,i)=>{const was=G.tasks[i]||0;
+      if(v>was)G.boxAct[i]=.4; // progress went up -> someone is working it right now
+      if(v>=1&&was<1){boxDone(G.M.tasks[i]);if(G.roles[G.me]!=='spec')toast('Một hộp cầu dao đã được sửa ('+nt.filter(x=>x>=1).length+'/'+NEED+')')}});
+    G.st=m.p||{};G.tasks=nt;G.exitOpen=!!m.exit;door.visible=!G.exitOpen;
+    taskLamps.forEach((l,i)=>l.color.set(G.tasks[i]>=1?0x22ff44:G.tasks[i]>0?0xffaa00:0xff2200));
+    const s=G.st[G.me]?.st;
+    if(s&&s!==me.lastSt){if(s==='caught')toast('Bạn đã bị bắt! Chờ đồng đội cứu.');if(s==='hurt'&&me.lastSt==='caught')toast('Bạn đã được cứu!');me.lastSt=s}
+  }
+  else if(m.t==='fx'){
+    if(m.k==='hit'){sfx(180,.25,'sawtooth',.3);if(m.id===G.me){$('hurt').style.opacity=1;setTimeout(()=>$('hurt').style.opacity=0,400);me.boost=1.5}}
+    if(m.k==='exit'){toast('LỐI THOÁT ĐÃ MỞ!');sfx(880,.4,'square',.15);setTimeout(()=>sfx(660,.4,'square',.15),450)}
+    if(m.k==='esc')toast(String(m.name).slice(0,16)+' đã trốn thoát');
+    if(m.k==='pick'&&waterMeshes[m.i]){waterMeshes[m.i].visible=false;G.taken.add(m.i);
+      if(m.id===G.me){me.inv.push('water');renderInv();toast('Đã cho Almond Water vào túi — Tab để mở túi');sfx(1200,.08,'square',.08)}}
+    if(m.k==='boom'){const t=G.M.tasks[m.i];if(t){bang(t);
+      if(G.roles[G.me]==='killer'){alarmMark.position.set(t[0],0,t[1]);alarmMark.visible=true;G.markT=3;toast('Có tiếng động! (cột đỏ)')}}}
+  }
+  else if(m.t==='end'){
+    G.phase='end';document.exitPointerLock?.();$('inv').classList.add('hidden');
+    $('endTitle').textContent=(m.esc||[]).length?'Có người đã thoát!':'Entity chiến thắng';
+    $('endBody').textContent='Thoát: '+((m.esc||[]).join(', ')||'không ai')+' · Chết: '+((m.dead||[]).join(', ')||'không ai');
+    $('againBtn').classList.toggle('hidden',!G.isHost);$('endWait').textContent=G.isHost?'':'Chờ chủ phòng bắt đầu ván mới…';
+    $('endOv').classList.remove('hidden');
+  }
+  else if(m.t==='full')$('msg').textContent='Phòng đã đầy hoặc đang chơi.';
+}
+function renderLobby(list,killer){
+  const ul=$('plist');ul.innerHTML='';
+  for(const p of list){
+    const li=document.createElement('li');
+    li.textContent=(p.id===killer?'👁 ENTITY — ':'🙂 ')+p.name+(p.id===G.me?' (bạn)':''); // textContent: names are untrusted
+    if(G.isHost){li.style.cursor='pointer';li.onclick=()=>{H.killer=p.id;lobbyBroadcast()}}
+    ul.append(li);
+  }
+}
+function startGame(m){
+  G.M=genMap(m.seed);RECTS=makeRects(G.M);buildWorld(G.M);
+  Object.assign(G,{phase:'play',roles:m.roles,names:m.names,exitOpen:false,tasks:Array(NTASK).fill(0),st:{},taken:new Set(),markT:0,boxAct:Array(NTASK).fill(0),boxTickT:Array(NTASK).fill(0)});
+  resetBoxes();
+  alarmMark.visible=false;$('inv').classList.add('hidden');
+  for(const a of Object.values(G.avatars))scene.remove(a);G.avatars={};
+  let ci=0;
+  for(const id of Object.keys(m.roles)){if(id===G.me)continue;const a=makeAvatar(m.roles[id],COLS[ci++%4]);scene.add(a);G.avatars[id]=a}
+  const sp=spawns(G.M,m.roles)[G.me],killer=m.roles[G.me]==='killer';
+  const spec=m.roles[G.me]==='spec';
+  // survivors: pitch dark, flashlight is life. killer: faint red night vision. spectator: lit, to inspect the layout
+  scene.fog.density=spec?.03:.07;hemi.color.set(killer?0xff5040:0xffefc0);hemi.intensity=spec?1:killer?.35:.1;
+  Object.assign(me,{x:sp[0],y:1.6,z:sp[1],flySp:8,yaw:0,pitch:0,stam:1,fl:!killer,slow:0,cd:0,boost:0,esc:false,sentHold:null,lastSt:'ok',
+    water:1,tired:false,ghost:false,picked:new Set(),inv:[],sc:null,scT:4,crouch:false,specIdx:0,stepAcc:0});
+  for(const [id,a] of Object.entries(G.avatars)){a.position.set(...(()=>{const s=spawns(G.M,m.roles)[id];return[s[0],0,s[1]]})())}
+  camera.fov=killer?85:75;camera.updateProjectionMatrix();
+  $('lobby').classList.add('hidden');$('endOv').classList.add('hidden');
+  toast(killer?'Bạn là ENTITY. Săn hết bọn họ.':m.roles[G.me]==='spec'?'Chế độ khám phá — click để bay':'Sửa '+NEED+' hộp cầu dao rồi tìm biển EXIT.');
+}
+
+// ---------- lobby buttons ----------
+const nameVal=()=>($('name').value.trim()||'Người chơi '+(Math.random()*90+10|0)).slice(0,16);
+function showRoom(code){$('join').classList.add('hidden');$('room').classList.remove('hidden');$('roomCode').textContent=code;
+  $('hostHint').classList.toggle('hidden',!G.isHost);$('startBtn').classList.toggle('hidden',!G.isHost);
+  $('invite').classList.toggle('hidden',!G.isHost);$('inviteLink').value=location.origin+location.pathname+'?room='+code}
+$('copyLink').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('inviteLink').value);$('copyLink').textContent='Đã sao chép ✓'}
+  catch{$('inviteLink').select();$('copyLink').textContent='Nhấn Ctrl+C để sao chép'} // clipboard API can be blocked
+};
+// opened from an invite link (?room=CODE): fill the code in, the friend only types a name and joins
+{const r=new URLSearchParams(location.search).get('room');
+  if(r&&/^[A-Z0-9]{5}$/i.test(r)){$('code').value=r.toUpperCase();$('msg').style.color='#e8d77a';
+    $('msg').textContent='Bạn được mời vào phòng '+r.toUpperCase()+' — nhập tên rồi bấm "Vào phòng".';$('name').focus()}}
+$('hostBtn').onclick=()=>{
+  audio();const name=nameVal(),code=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.random()*32|0]).join('');
+  G.isHost=true;H={players:new Map(),play:false};
+  peer=new Peer('bkrm-'+code);$('msg').textContent='Đang tạo phòng…';
+  peer.on('open',id=>{G.me=id;$('msg').textContent='';showRoom(code);onHostMsg(id,{t:'hello',name})});
+  peer.on('connection',c=>{
+    c.on('open',()=>conns.set(c.peer,c));c.on('data',m=>onHostMsg(c.peer,m));
+    c.on('close',()=>{conns.delete(c.peer);H.players.delete(c.peer);if(H.killer===c.peer)H.killer=G.me;if(!H.play)lobbyBroadcast()});
+  });
+  peer.on('error',e=>$('msg').textContent='Lỗi: '+e.type);
+  hostIv??=setInterval(hostTick,1000/15);
+};
+let hostIv=null;
+// solo test as a survivor: be your own host with no network and no entity (killer id 'none' matches nobody)
+$('soloBtn').onclick=()=>{
+  audio();G.isHost=true;G.me='me';H={players:new Map(),play:false,killer:'none'};
+  onHostMsg('me',{t:'hello',name:nameVal()});hostStart();hostIv??=setInterval(hostTick,1000/15);
+};
+$('joinBtn').onclick=()=>{
+  audio();const code=$('code').value.trim().toUpperCase(),name=nameVal();
+  if(code.length!==5){$('msg').textContent='Mã phòng gồm 5 ký tự.';return}
+  peer=new Peer();$('msg').textContent='Đang kết nối…';
+  peer.on('open',id=>{
+    G.me=id;conn=peer.connect('bkrm-'+code,{reliable:true});
+    conn.on('open',()=>{$('msg').textContent='';conn.send({t:'hello',name});showRoom(code)});
+    conn.on('data',onClientMsg);
+    conn.on('close',()=>{$('msg').textContent='Mất kết nối với chủ phòng. Tải lại trang để vào lại.';G.phase='lobby';$('lobby').classList.remove('hidden');document.exitPointerLock?.()});
+  });
+  peer.on('error',e=>$('msg').textContent=e.type==='peer-unavailable'?'Không tìm thấy phòng.':'Lỗi: '+e.type);
+};
+// offline free-fly: no network, the local player is the only one and has role 'spec'
+const startSpec=()=>{G.me='me';startGame({seed:Math.random()*1e9|0,roles:{me:'spec'},names:{me:'Spectator'}})};
+$('specBtn').onclick=()=>{audio();startSpec()};
+$('startBtn').onclick=()=>{if(H.players.size<1)return;hostStart()};
+$('againBtn').onclick=()=>lobbyBroadcast();
+
+// ---------- settings (volume, mouse, key binds), remembered in this browser ----------
+const DEF_KB={fwd:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',crouch:'KeyC',use:'KeyE',light:'KeyF',inv:'Tab',check:'Space'};
+const KB_LABEL={fwd:'Đi tới',back:'Lùi',left:'Sang trái',right:'Sang phải',sprint:'Chạy (Spectator: bay xuống)',crouch:'Cúi / bò',
+  use:'Tương tác (sửa, cứu, nhặt)',light:'Bật/tắt đèn pin',inv:'Túi đồ',check:'Skill check (Spectator: bay lên)'};
+const CFG={v:2,vol:.52,sens:1,vhs:true,kb:{...DEF_KB}};
+try{const s=JSON.parse(localStorage.getItem('bkrm-cfg')||'null'); // storage may be blocked
+  if(s){CFG.sens=s.sens??1;CFG.vhs=s.vhs??true;CFG.kb={...DEF_KB,...s.kb};if(s.v===2)CFG.vol=s.vol}}catch{} // v1 saves keep keys/mouse, take the new quieter volume
+const saveCfg=()=>{try{localStorage.setItem('bkrm-cfg',JSON.stringify(CFG))}catch{}};
+const keyName=c=>({ShiftLeft:'Shift',ShiftRight:'Shift phải',ControlLeft:'Ctrl',AltLeft:'Alt',Space:'Space',Tab:'Tab',CapsLock:'Caps'}[c]||c.replace(/^Key|^Digit|^Numpad/,''));
+const KN=a=>esc(keyName(CFG.kb[a]));
+let rebinding=null;
+function renderKb(){
+  const box=$('kbList');box.innerHTML='';
+  for(const a of Object.keys(DEF_KB)){
+    const row=document.createElement('div');row.className='kbrow';row.innerHTML=`<span>${KB_LABEL[a]}</span>`;
+    const b=document.createElement('button');b.textContent=rebinding===a?'Nhấn phím…':keyName(CFG.kb[a]);
+    b.onclick=()=>{rebinding=a;renderKb()};row.append(b);box.append(row);
+  }
+}
+function openSettings(open){
+  $('set').classList.toggle('hidden',!open);rebinding=null;
+  if(open){document.exitPointerLock?.();$('sVol').value=CFG.vol*100;$('sSens').value=CFG.sens*100;$('sVhs').checked=CFG.vhs;renderKb()}
+}
+const applyAudio=()=>{if(AC){OUT.gain.value=CFG.vol;HUM.gain.value=.016}}; // hum fixed, 35% under the old default
+$('gear').onclick=()=>openSettings(true);$('setClose').onclick=()=>openSettings(false);
+$('sVol').oninput=e=>{CFG.vol=e.target.value/100;applyAudio();saveCfg()};
+$('sSens').oninput=e=>{CFG.sens=e.target.value/100;saveCfg()};
+$('sVhs').onchange=e=>{CFG.vhs=e.target.checked;saveCfg()};
+$('kbReset').onclick=()=>{CFG.kb={...DEF_KB};saveCfg();renderKb()};
+document.addEventListener('pointerlockchange',()=>$('gear').classList.toggle('hidden',locked()));
+
+// ---------- input ----------
+const K={},KD=a=>!!K[CFG.kb[a]];
+addEventListener('keydown',e=>{
+  if(rebinding){ // capture the next key for the action being rebound; Esc cancels; a taken key swaps places
+    e.preventDefault();
+    if(e.code!=='Escape'){const other=Object.keys(CFG.kb).find(a=>CFG.kb[a]===e.code);if(other)CFG.kb[other]=CFG.kb[rebinding];CFG.kb[rebinding]=e.code;saveCfg()}
+    rebinding=null;renderKb();return;
+  }
+  K[e.code]=true;if(e.code===CFG.kb.light)me.fl=!me.fl;
+  if(e.code===CFG.kb.check&&me.sc&&!e.repeat)resolveCheck();
+  const surv=G.phase==='play'&&G.roles[G.me]==='surv'&&alive(G.st[G.me]?.st||'ok');
+  if(e.code===CFG.kb.inv||e.code==='Tab'&&G.phase==='play')e.preventDefault(); // Tab must not move browser focus mid-game
+  if(e.code===CFG.kb.inv&&surv)toggleInv();
+  if(e.code===CFG.kb.use&&!e.repeat&&surv){const i=nearWater();if(i>=0){
+    if(me.inv.length>=INV_SLOTS)toast('Túi đã đầy');else{me.picked.add(i);send({t:'pick',i})}}}
+  if(G.phase==='play'&&G.roles[G.me]==='spec'){if(e.code==='KeyN')startSpec();if(e.code==='KeyG')scene.fog.density=scene.fog.density>.01?.004:.03}});
+addEventListener('wheel',e=>{if(G.roles[G.me]==='spec'||me.ghost)me.flySp=Math.max(1,Math.min(60,me.flySp*(e.deltaY<0?1.2:1/1.2)))});
+addEventListener('keyup',e=>K[e.code]=false);
+const locked=()=>document.pointerLockElement===renderer.domElement;
+renderer.domElement.addEventListener('mousedown',e=>{
+  if(G.phase!=='play')return;
+  if(!locked()){renderer.domElement.requestPointerLock();return}
+  if(e.button===0&&G.roles[G.me]==='killer')attack();
+  if(G.roles[G.me]==='surv'&&['dead','escaped'].includes(G.st[G.me]?.st))jumpToNext();
+});
+addEventListener('mousemove',e=>{if(!locked())return;const k=.0022*CFG.sens;me.yaw-=e.movementX*k;me.pitch=Math.max(-1.4,Math.min(1.4,me.pitch-e.movementY*k))});
+function attack(){
+  if(me.cd>0)return;me.cd=2.5;me.slow=1.5;sfx(90,.15,'triangle',.25);
+  const fx=-Math.sin(me.yaw),fz=-Math.cos(me.yaw);let best=null,bd=2.3;
+  for(const [id,o] of Object.entries(G.st)){
+    if(G.roles[id]!=='surv'||!(o.st==='ok'||o.st==='hurt'))continue;
+    const dx=o.x-me.x,dz=o.z-me.z,d=Math.hypot(dx,dz);
+    if(d<bd&&(dx*fx+dz*fz)/d>.5&&!blocked(me.x,me.z,o.x,o.z)){bd=d;best=id}
+  }
+  if(best)send({t:'hit',id:best});
+}
+
+// ---------- audio (WebAudio, no files) ----------
+let AC,OUT,HUM; // OUT: master volume every sound goes through; HUM: ambient fluorescent hum level
+function audio(){
+  if(AC)return;AC=new AudioContext();OUT=AC.createGain();OUT.connect(AC.destination);
+  const o=AC.createOscillator(),f=AC.createBiquadFilter();HUM=AC.createGain();
+  o.type='sawtooth';o.frequency.value=120;f.type='lowpass';f.frequency.value=380;
+  o.connect(f).connect(HUM).connect(OUT);o.start();applyAudio();
+}
+function sfx(freq,dur,type,vol,at=0){
+  if(!AC)return;const t=AC.currentTime+at,o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(freq*.5,t+dur);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g).connect(OUT);o.start(t);o.stop(t+dur+.05);
+}
+// positional sound: route a node into 3D so you hear left/right and near/far; pos null = not spatial (your own steps)
+let noiseBuf;
+const getNoise=()=>{if(!noiseBuf){noiseBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}return noiseBuf};
+function spatial(node,pos,y=.3){
+  if(!pos){node.connect(OUT);return}
+  const p=AC.createPanner();Object.assign(p,{panningModel:'HRTF',distanceModel:'inverse',refDistance:1.5,rolloffFactor:1.3,maxDistance:60});
+  p.positionX.value=pos[0];p.positionY.value=y;p.positionZ.value=pos[1];node.connect(p).connect(OUT);
+}
+function noise3d(pos,vol,cut,dur,type='lowpass'){
+  if(!AC)return;
+  const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();
+  s.buffer=getNoise();f.type=type;f.frequency.value=cut;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  s.connect(f).connect(g);spatial(g,pos);
+  s.start(t,Math.random()*.5);s.stop(t+dur+.02);
+}
+// ---------- breaker box sounds ----------
+// while someone repairs: a looping electrical buzz at the box plus random ratchet clicks and spark crackles.
+// when it finishes: a heavy relay clunk and a rising power-up hum. Everyone hears these, the entity too.
+const boxBuzz=[];
+function buzzFor(i,pos){
+  if(!AC)return null;
+  if(!boxBuzz[i]){const o=AC.createOscillator(),f=AC.createBiquadFilter(),g=AC.createGain();
+    o.type='sawtooth';o.frequency.value=98+i*3;f.type='bandpass';f.frequency.value=420;f.Q.value=2;g.gain.value=0;
+    o.connect(f).connect(g);spatial(g,pos,1);o.start();boxBuzz[i]={o,g}}
+  return boxBuzz[i].g;
+}
+const resetBoxes=()=>{for(const b of boxBuzz)if(b){b.o.stop();b.g.disconnect()}boxBuzz.length=0}; // new map = new box positions
+function boxTick(pos){
+  noise3d(pos,.9,2600+Math.random()*1200,.04,'bandpass'); // ratchet click
+  if(Math.random()<.25)for(let k=0;k<3;k++)setTimeout(()=>noise3d(pos,.6,5000,.02,'highpass'),k*35+Math.random()*30); // spark crackle
+}
+function boxDone(pos){
+  noise3d(pos,3,180,.5);noise3d(pos,1.5,1800,.08,'bandpass'); // relay clunk
+  if(!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
+  o.type='triangle';o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(260,t+1);
+  g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.5,t+.3);g.gain.exponentialRampToValueAtTime(.001,t+1.4);
+  o.connect(g);spatial(g,pos,1);o.start(t);o.stop(t+1.5);
+}
+function updateBoxes(dt){
+  if(!G.M)return;
+  G.M.tasks.forEach((t,i)=>{
+    const active=(G.boxAct[i]-=dt)>0,g=buzzFor(i,t);
+    if(g)g.gain.setTargetAtTime(active?.35:0,AC.currentTime,.15);
+    if(active&&(G.boxTickT[i]-=dt)<=0){G.boxTickT[i]=.18+Math.random()*.35;boxTick(t)}
+  });
+}
+// heavy footstep on carpet: a low sine thump (heel) + a muffled noise scuff, both through the same panner
+function footstep(pos,vol,heavy){
+  if(!AC)return;
+  const t=AC.currentTime,out=AC.createGain();out.gain.value=vol;spatial(out,pos,.1);
+  const o=AC.createOscillator(),og=AC.createGain(),f0=(heavy?55:80)*(.9+Math.random()*.2);
+  o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f0*.5,t+.12);
+  og.gain.setValueAtTime(.9,t);og.gain.exponentialRampToValueAtTime(.001,t+(heavy?.22:.14));o.connect(og).connect(out);o.start(t);o.stop(t+.25);
+  const s=AC.createBufferSource(),f=AC.createBiquadFilter(),ng=AC.createGain();s.buffer=getNoise();
+  f.type='lowpass';f.frequency.value=heavy?240:420;ng.gain.setValueAtTime(.5,t);ng.gain.exponentialRampToValueAtTime(.001,t+.16);
+  s.connect(f).connect(ng).connect(out);s.start(t,Math.random()*1.5);s.stop(t+.18);
+}
+const bang=pos=>{noise3d(pos,4,2500,.6);noise3d(pos,3,200,1.2)}; // botched breaker: loud crack + low boom
+const fwd=new THREE.Vector3();
+function updateListener(){
+  if(!AC)return;const L=AC.listener;camera.getWorldDirection(fwd);
+  if(L.positionX){L.positionX.value=camera.position.x;L.positionY.value=camera.position.y;L.positionZ.value=camera.position.z;
+    L.forwardX.value=fwd.x;L.forwardY.value=fwd.y;L.forwardZ.value=fwd.z;L.upX.value=0;L.upY.value=1;L.upZ.value=0}
+  else{L.setPosition(camera.position.x,camera.position.y,camera.position.z);L.setOrientation(fwd.x,fwd.y,fwd.z,0,1,0)} // Firefox
+}
+// ---------- almond water & inventory ----------
+const INV_SLOTS=6;
+// interactions need you close AND with a clear line to the thing: no repairing/rescuing/picking through walls
+const reachable=(x,z,d)=>Math.hypot(x-me.x,z-me.z)<d&&!blocked(me.x,me.z,x,z);
+const taskFront=t=>[t[0],t[1]+.45]; // boxes stand on a wall's south side; you work them from the open side
+const nearWater=()=>G.M.waters.findIndex((b,i)=>!G.taken.has(i)&&!me.picked.has(i)&&reachable(b[0],b[1],1.3));
+const fixable=()=>G.M.tasks.findIndex((t,i)=>G.tasks[i]<1&&reachable(...taskFront(t),1.4));
+const rescuable=()=>Object.keys(G.st).find(id=>id!==G.me&&G.st[id].st==='caught'&&reachable(G.st[id].x,G.st[id].z,1.8));
+const WATER_SVG='<svg width="22" height="36" viewBox="0 0 22 36"><rect x="7" y="1" width="8" height="5" rx="1" fill="#2d5fa8"/><path d="M6 6h10v4l3 4v19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V14l3-4z" fill="#efe4cb" stroke="#cbbf9f"/><rect x="3" y="18" width="16" height="8" fill="#c9a56a"/></svg>';
+function toggleInv(open=$('inv').classList.contains('hidden')){
+  $('inv').classList.toggle('hidden',!open);if(open){document.exitPointerLock?.();renderInv()}
+}
+function renderInv(){
+  const g=$('invGrid');g.innerHTML='';
+  for(let k=0;k<INV_SLOTS;k++){
+    const it=me.inv[k],d=document.createElement('button');d.className='slot'+(it?'':' empty');
+    d.innerHTML=it?WATER_SVG+'<span>Almond Water</span>':'';
+    if(it)d.onclick=()=>{
+      if(me.water>=.99){toast('Bạn chưa khát');return}
+      me.inv.splice(k,1);me.water=Math.min(1,me.water+.5);sfx(300,.25,'sine',.15);toast('Đã uống Almond Water (+50%)');renderInv();
+    };
+    g.append(d);
+  }
+}
+$('invClose').onclick=()=>toggleInv(false);
+// skill check: a needle sweeps a bar, hit SPACE inside the zone; a miss costs progress and makes noise
+function resolveCheck(){
+  const s=me.sc;me.sc=null;me.scT=3+Math.random()*5;
+  if(s.p>=s.z0&&s.p<=s.z0+s.w){sfx(1320,.12,'sine',.12);sfx(1980,.18,'sine',.09,.07);return} // success chime
+  send({t:'fail',i:s.i});sfx(110,.35,'sawtooth',.25);toast('Hỏng! Tiếng nổ đã thu hút Entity'); // error buzz (the bang comes from the host)
+}
+
+// ---------- per-frame ----------
+let toastT=0;function toast(s){$('toast').textContent=s;toastT=3.5}
+const grainEl=$('grain');{const c=document.createElement('canvas');c.width=c.height=200;const g=c.getContext('2d'),d=g.createImageData(200,200);
+  for(let i=0;i<d.data.length;i+=4){const v=Math.random()*255;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}g.putImageData(d,0,0);grainEl.style.backgroundImage=`url(${c.toDataURL()})`}
+const alive=s=>s==='ok'||s==='hurt';
+
+// noclip fly: forward goes where you look, check/sprint keys straight up/down
+function fly(dt){
+  const sp=me.flySp,cp=Math.cos(me.pitch),fw=KD('fwd')-KD('back'),sd=KD('right')-KD('left'),up=KD('check')-KD('sprint');
+  me.x+=(-Math.sin(me.yaw)*cp*fw+Math.cos(me.yaw)*sd)*sp*dt;me.y+=(Math.sin(me.pitch)*fw+up)*sp*dt;me.z+=(-Math.cos(me.yaw)*cp*fw-Math.sin(me.yaw)*sd)*sp*dt;
+  camera.position.set(me.x,me.y,me.z);camera.rotation.set(me.pitch,me.yaw,0);flash.intensity=me.fl?28:0;
+}
+// dead spectator click: jump next to the next living player (or the entity)
+function jumpToNext(){
+  const ids=Object.keys(G.st).filter(id=>id!==G.me&&(G.roles[id]==='killer'||alive(G.st[id].st)||G.st[id].st==='caught'));
+  if(!ids.length)return;
+  const id=ids[me.specIdx++%ids.length],o=G.st[id];
+  me.x=o.x+Math.sin(o.ry)*2;me.z=o.z+Math.cos(o.ry)*2;me.y=2;me.yaw=o.ry;me.pitch=-.2; // 2m behind them, looking their way
+  toast('Đang ở gần: '+String(G.names[id]||'?').slice(0,16)+(G.roles[id]==='killer'?' (Entity)':''));
+}
+function updateLocal(dt){
+  const role=G.roles[G.me],st=G.st[G.me]?.st||'ok',killer=role==='killer',canMove=killer||alive(st);
+  if(role==='spec'){fly(dt);return}
+  if(!killer&&(st==='dead'||st==='escaped')){ // dead or out: free-fly spectator, lit so you can follow the match
+    if(!me.ghost){me.ghost=true;me.y=1.6;me.flySp=6; // start flying from where you fell
+      hemi.color.set(0xffefc0);hemi.intensity=1;scene.fog.density=.03;$('inv').classList.add('hidden');
+      toast('Bạn đang xem bằng Spectator — click để bay tới người còn sống')}
+    fly(dt);return;
+  }
+  me.cd=Math.max(0,me.cd-dt);me.slow=Math.max(0,me.slow-dt);me.boost=Math.max(0,me.boost-dt);
+  // E: rescue a caught teammate first, else repair the nearest unfinished breaker box
+  let tgt=null;
+  if(KD('use')&&!killer&&canMove){
+    const r=rescuable();if(r)tgt='p:'+r;else{const i=fixable();if(i>=0)tgt='t:'+i}
+  }
+  me.holding=tgt;
+  if(tgt!==me.sentHold){me.sentHold=tgt;send({t:'hold',k:tgt})}
+  // skill checks pop up every few seconds while repairing; letting go cancels without penalty
+  if(tgt?.startsWith('t:')){
+    if(me.sc){if((me.sc.p+=dt/1.1)>1)resolveCheck()}
+    else if((me.scT-=dt)<=0){me.sc={i:+tgt.slice(2),p:0,z0:.45+Math.random()*.4,w:.13};sfx(1700,.05,'square',.09);sfx(1700,.05,'square',.09,.09)} // double warning beep
+  }else me.sc=null;
+  // crouch: stays forced while you are still under a crawl gap, so you can't stand up inside a wall
+  me.crouch=!killer&&canMove&&(KD('crouch')||me.crouch&&RECTS.some(b=>b.crawl&&touches(b,me,.4)));
+  if(canMove&&!tgt){
+    let fx=KD('right')-KD('left'),fz=KD('back')-KD('fwd');const len=Math.hypot(fx,fz);
+    let sp,run=false;
+    if(killer)sp=me.slow>0?2:4.4;
+    else{
+      // exhausted at 0 stamina: no sprint until it refills to 30% (otherwise run flickers on/off every frame)
+      if(me.stam<=0)me.tired=true;else if(me.tired&&me.stam>=.3)me.tired=false;
+      const thirsty=me.water<=0; // out of almond water: no sprinting, slower, stamina refills at half speed
+      run=!me.crouch&&!me.tired&&!thirsty&&KD('sprint')&&len>0;
+      sp=me.crouch?1.5:(run?4.6:thirsty?2.4:3)*(me.boost>0?1.4:1);
+      me.stam=Math.max(0,Math.min(1,me.stam+(run?-dt/4:dt/(thirsty?16:8))));
+    }
+    if(len){fx/=len;fz/=len;const s=Math.sin(me.yaw),c=Math.cos(me.yaw);me.x+=(fx*c+fz*s)*sp*dt;me.z+=(-fx*s+fz*c)*sp*dt;me.bob+=dt*sp*2.4;
+      if((me.stepAcc+=sp*dt)>(killer?1.3:run?1.1:.8)){me.stepAcc=0;if(!me.crouch)footstep(null,killer?.5:run?.35:.2,killer)}}
+    collide(me,.35);
+  }
+  if(!killer&&alive(st))me.water=Math.max(0,me.water-dt/WATER_LIFE); // thirst drains over time
+  const lit=me.fl; // flashlight is unlimited
+  if(!killer&&alive(st)&&G.exitOpen&&me.z<-.4&&!me.esc){me.esc=true;send({t:'escape'})}
+  if((me.sendT-=dt)<=0){me.sendT=1/15;send({t:'pos',x:me.x,z:me.z,ry:me.yaw,pt:me.pitch,fl:lit,cr:me.crouch})}
+  const eye=killer?2.1:st==='caught'?.6:me.crouch?.9:1.6;
+  camera.position.y+=(eye+Math.sin(me.bob)*.04-camera.position.y)*Math.min(1,dt*12); // smooth crouch
+  camera.position.x=me.x;camera.position.z=me.z;camera.rotation.set(me.pitch,me.yaw,0);
+  flash.intensity=!killer&&lit&&alive(st)?28:0;
+  // heartbeat: survivors hear the entity before they see it
+  const kid=Object.keys(G.roles).find(id=>G.roles[id]==='killer'),ko=G.st[kid];
+  if(!killer&&alive(st)&&ko){const d=Math.hypot(ko.x-me.x,ko.z-me.z);if(d<20&&(me.hb-=dt)<=0){const v=.15+.5*(1-d/20);sfx(70,.15,'sine',v);sfx(65,.15,'sine',v*.8,.18);me.hb=.35+d/20*1.2}}
+}
+function updateRemote(dt){
+  const k=1-Math.exp(-dt*12);
+  for(const [id,a] of Object.entries(G.avatars)){
+    const o=G.st[id];if(!o){a.visible=false;continue}
+    a.position.x+=(o.x-a.position.x)*k;a.position.z+=(o.z-a.position.z)*k;
+    const dr=Math.atan2(Math.sin(o.ry-a.rotation.y),Math.cos(o.ry-a.rotation.y));a.rotation.y+=dr*k;
+    a.visible=o.st!=='dead'&&o.st!=='escaped';a.rotation.x=o.st==='caught'?-1.35:0;
+    a.scale.y=o.cr?.6:1;
+    if(a.userData.spot)a.userData.spot.intensity=o.fl&&alive(o.st)?30:0;
+    // footsteps from network movement: heavy thuds for the entity, louder when running, silent when crouched
+    const u=a.userData,killer=G.roles[id]==='killer';
+    if(u.lx===undefined){u.lx=o.x;u.lz=o.z;u.acc=0}
+    const moved=Math.hypot(o.x-u.lx,o.z-u.lz);u.lx=o.x;u.lz=o.z;
+    if(moved>3)continue; // respawn/teleport, not a step
+    u.since=(u.since||0)+dt;if(moved){u.spd=moved/u.since;u.since=0} // updates arrive at 15Hz, not every frame
+    const run=u.spd>3.8;
+    if((u.acc+=moved)>(killer?1.3:run?1.1:.8)){u.acc=0;if(!o.cr&&(killer||alive(o.st)))footstep([o.x,o.z],killer?2:run?1.2:.6,killer)}
+  }
+}
+function updateLights(dt){
+  let ch=false;
+  for(const f of fixtures)if(f.flick&&(f.tm-=dt)<=0){f.lvl=Math.random()<.3?.1:1;f.tm=f.lvl<1?.05+Math.random()*.15:.2+Math.random()*2.5;fixMesh.setColorAt(f.k,fixColor(f,f.lvl));ch=true}
+  if(ch)fixMesh.instanceColor.needsUpdate=true;
+  const near=fixtures.filter(f=>(f.on||f.flick)&&!f.red).map(f=>[f,(f.p[0]-me.x)**2+(f.p[1]-me.z)**2]).sort((a,b)=>a[1]-b[1]);
+  pool.forEach((l,i)=>{const e=near[i];if(e){l.position.set(e[0].p[0]+.5,WH-.3,e[0].p[1]);l.intensity=3.5*e[0].lvl}else l.intensity=0});
+  if(glow)glow.visible=G.exitOpen;
+  if(alarmMark.visible&&(G.markT-=dt)<=0)alarmMark.visible=false;
+  // dust motes drifting around the camera, wrapped into a 12m box
+  const a=dust.geometry.attributes.position.array;
+  for(let i=0;i<a.length;i+=3){a[i]+=Math.sin(i+performance.now()*.0003)*dt*.05;a[i+1]-=dt*.02;
+    for(const [k,c] of [[0,camera.position.x],[2,camera.position.z]])if(Math.abs(a[i+k]-c)>6)a[i+k]=c+(Math.random()-.5)*12;if(a[i+1]<0)a[i+1]=WH}
+  dust.geometry.attributes.position.needsUpdate=true;
+}
+function updateHud(){
+  const role=G.roles[G.me],o=G.st[G.me]||{st:'ok'},done=G.tasks.filter(x=>x>=1).length;
+  const bar=p=>`<div class="bar"><i style="width:${Math.round(Math.min(1,p)*100)}%"></i></div>`;
+  let hud,c='';
+  if(role==='spec'){
+    hud=`<b style="color:#8cf">SPECTATOR</b> · x ${me.x.toFixed(0)} · y ${me.y.toFixed(1)} · z ${me.z.toFixed(0)} · tốc độ ${me.flySp.toFixed(0)}<br>
+      WASD bay · Space lên · Shift xuống · Cuộn chuột: tốc độ<br>N: bản đồ mới · G: bật/tắt sương (nhìn xa) · F: đèn pin · F5: về sảnh<br>
+      <span style="opacity:.7">Bay lên trên trần (y &gt; ${WH}) để nhìn toàn bản đồ từ trên xuống</span>`;
+  }else if(role==='killer'){
+    const left=Object.values(G.st).filter((p,i)=>alive(p.st)).length-1;
+    hud=`<b style="color:#f66">ENTITY</b><br>Còn sống sót: ${Math.max(0,left)}<br>Cầu dao: ${done}/${NEED}${G.exitOpen?' · <b>CỬA ĐÃ MỞ</b>':''}<br>Tấn công: ${me.cd>0?'hồi '+me.cd.toFixed(1)+'s':'sẵn sàng'}`;
+  }else{
+    const sl={ok:'Khỏe',hurt:'<span style="color:#f88">Bị thương</span>',caught:'<span style="color:#f44">Bị bắt</span>',dead:'Đã chết',escaped:'Đã thoát'}[o.st];
+    const sCol=me.tired||me.stam<.2?'#e0533f':'linear-gradient(90deg,#e8d77a,#f2b24a)';
+    const wCol=me.water>.2?'linear-gradient(90deg,#d9c9a3,#f4ecd8)':'#e0533f';
+    const nWater=me.inv.filter(x=>x==='water').length;
+    hud=`<div class="panel">
+      <div class="ttl" style="color:#e8d77a">Người sống sót <span style="font-weight:400;color:#eee">· ${sl}${me.crouch?' · <i>đang cúi</i>':''}</span></div>
+      <div class="sub">Cầu dao ${done}/${NEED}${G.exitOpen?' · <b style="color:#9fe08f">LỐI THOÁT ĐÃ MỞ — tìm biển EXIT</b>':''}</div>
+      <div class="meter"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#e8d77a"/></svg>
+        <div class="track"><i style="width:${me.stam*100}%;background:${sCol}"></i></div><span class="pct">${me.tired?'MỆT':Math.round(me.stam*100)+'%'}</span></div>
+      <div class="meter"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2s7 8 7 13a7 7 0 0 1-14 0c0-5 7-13 7-13z" fill="#efe4cb"/></svg>
+        <div class="track${me.water<.15?' low':''}"><i style="width:${me.water*100}%;background:${wCol}"></i></div><span class="pct">${me.water<=0?'KHÁT':Math.round(me.water*100)+'%'}</span></div>
+      <span class="hint"><span class="key">${KN('inv')}</span> Túi đồ: ${nWater} Almond Water · <span class="key">${KN('light')}</span> đèn · <span class="key">${KN('crouch')}</span> cúi</span>
+    </div>`;
+    if(me.sc)c=`<b style="color:#ffd84a">SKILL CHECK — nhấn ${KN('check')} trong vùng sáng!</b><div class="sc"><b style="left:${me.sc.z0*100}%;width:${me.sc.w*100}%"></b><i style="left:${Math.min(1,me.sc.p)*100}%"></i></div>`;
+    else if(me.holding?.startsWith('t:'))c='Đang sửa cầu dao'+bar(G.tasks[+me.holding.slice(2)]);
+    else if(me.holding?.startsWith('p:'))c='Đang cứu đồng đội'+bar(G.st[me.holding.slice(2)]?.fp||0);
+    else if(o.st==='caught')c=`Bạn bị bắt! Đồng đội giữ E để cứu (còn ${o.ct}s)`+bar(o.fp);
+    else if(o.st==='dead'||o.st==='escaped')c=`${o.st==='dead'?'Bạn đã chết.':'Bạn đã trốn thoát!'} <b>Spectator</b><br>
+      <span style="font-size:13px;opacity:.85">${KN('fwd')}${KN('left')}${KN('back')}${KN('right')} bay · <span class="key">${KN('check')}</span>/<span class="key">${KN('sprint')}</span> lên/xuống · cuộn chuột: tốc độ · click: tới người còn sống</span>`;
+    else if(alive(o.st)){
+      if(rescuable())c=`Giữ <span class="key">${KN('use')}</span> để cứu đồng đội`;
+      else if(nearWater()>=0)c=`Nhấn <span class="key">${KN('use')}</span> để nhặt Almond Water`;
+      else if(fixable()>=0)c=`Giữ <span class="key">${KN('use')}</span> để sửa cầu dao`;
+    }
+    $('vig').style.background=`radial-gradient(ellipse at center,transparent 45%,${o.st==='hurt'?'rgba(110,0,0,.8)':'rgba(0,0,0,.7)'})`;
+  }
+  if(!locked()&&G.phase==='play')c='<b>Click để điều khiển</b><br>'+c;
+  $('hud').innerHTML=hud;$('center').innerHTML=c;
+}
+const clock=new THREE.Clock();
+(function frame(){
+  const dt=Math.min(.05,clock.getDelta());
+  if(G.phase==='play'){updateLocal(dt);updateRemote(dt);updateLights(dt);updateHud();updateListener();updateBoxes(dt)}
+  else if(boxBuzz.length)resetBoxes(); // silence buzzing boxes in the lobby / end screen
+  else{$('hud').innerHTML='';$('center').innerHTML=''}
+  if((toastT-=dt)<=0)$('toast').textContent='';
+  grainEl.style.backgroundPosition=`${Math.random()*200|0}px ${Math.random()*200|0}px`;
+  const vhs=CFG.vhs&&G.phase!=='lobby';
+  grainEl.style.display=vhs?'none':'';$('osd').classList.toggle('hidden',!vhs);
+  if(vhs){
+    vhsPass.uniforms.time.value=performance.now()/1000;composer.render();
+    const s=(performance.now()/1000|0)+(10*3600+42*60),hh=(s/3600|0)%12||12,mm=(s/60|0)%60,ss=s%60,p=v=>String(v).padStart(2,'0');
+    $('osdTime').textContent=`${(s/3600|0)%24<12?'AM':'PM'} ${hh}:${p(mm)}:${p(ss)}`; // camcorder clock, starts at 10:42 AM
+  }else renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+})();
+
+// ---------- self-check: open index.html#test and read the console ----------
+if(location.hash==='#test'){
+  window.__dbg={flash,me,camera,G,get H(){return H}}; // test-mode only: inspect state from the console
+  const reach=M=>{const seen=new Set(['0,0']),q=[[0,0]];while(q.length){const [i,j]=q.pop();
+    for(const [a,b,open] of [[i+1,j,i+1<N&&!M.v[j][i+1]],[i-1,j,i>0&&!M.v[j][i]],[i,j+1,j+1<N&&!M.h[j+1][i]],[i,j-1,j>0&&!M.h[j][i]]])
+      if(open&&!seen.has(a+','+b)){seen.add(a+','+b);q.push([a,b])}}return seen.size};
+  let ok=true;
+  for(let s=1;s<60;s++){const a=genMap(s);ok&&=JSON.stringify(a)===JSON.stringify(genMap(s))&&reach(a)===N*N&&new Set(a.tasks.map(String)).size===NTASK;
+    // the entity can't use crawl gaps: with them treated as solid it must still reach every cell
+    const k={h:a.h.map(r=>[...r]),v:a.v.map(r=>[...r])};for(const [hz,j,i] of a.crawl)if(hz)k.h[j][i]=true;else k.v[j][i]=true;ok&&=reach(k)===N*N&&a.crawl.length>0}
+  const p={x:4,z:2};RECTS=[{x0:3,x1:5,z0:1.9,z1:2.1}];collide(p,.35);ok&&=Math.abs(p.z-2)>=.44;
+  const q={x:4,z:2,crouch:true};RECTS=[{x0:3,x1:5,z0:1.9,z1:2.1,crawl:1}];collide(q,.35);ok&&=q.z===2; // crouched passes a crawl gap
+  RECTS=[{x0:3,x1:5,z0:1.9,z1:2.1}];ok&&=blocked(4,1,4,3)&&!blocked(1,1,1,3)&&!blocked(4,1,6,1);RECTS=[]; // hits can't pass walls
+  console.log(ok?'SELFTEST OK':'SELFTEST FAIL');
+}
+</script>
+</body>
+</html>
