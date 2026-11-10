@@ -34,9 +34,6 @@ button:hover{background:#8a7a2e}
 .slot{height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#2a281d;border:1px solid #5a5230;border-radius:8px;color:#eee;font-size:13px;margin:0}
 .slot:hover{background:#3a3624;border-color:#9fe08f}
 .slot.empty{background:#16150f;cursor:default}
-#osd{position:fixed;inset:0;pointer-events:none;z-index:4;font-family:'VT323',monospace;color:#f2f2e8;font-size:30px;line-height:1;text-shadow:2px 0 #f003,-2px 0 #0ff3,0 0 6px #fff6}
-#osd .tl{position:absolute;left:5%;top:6%}
-#osd .br{position:absolute;right:5%;bottom:7%;text-align:right}
 #gear{position:fixed;top:16px;right:16px;z-index:12;display:flex;align-items:center;gap:8px;padding:10px 18px 10px 14px;font-size:18px;font-weight:700;
   border-radius:28px;background:#2a2615ee;border:2px solid #e8d77a;color:#e8d77a;box-shadow:0 0 18px rgba(232,215,122,.35)}
 #gear span{font-size:30px;line-height:1}
@@ -55,9 +52,7 @@ button:hover{background:#8a7a2e}
 .hidden{display:none!important}
 li{margin:4px 0}
 </style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 </head>
 <body>
 <div id="lobby" class="ov"><div class="box">
@@ -93,22 +88,15 @@ li{margin:4px 0}
 <div id="set" class="ov hidden" style="z-index:13"><div class="box" style="min-width:360px;max-height:90vh;overflow:auto">
   <h1 style="font-size:20px">CÀI ĐẶT</h1>
   <label class="srow">Âm lượng tổng <input type="range" id="sVol" min="0" max="100"></label>
-  <label class="srow">Độ nhạy chuột <input type="range" id="sSens" min="20" max="300"></label>
-  <label class="srow">Hiệu ứng băng VHS (tắt nếu máy bị giật) <input type="checkbox" id="sVhs" style="width:20px;height:20px;accent-color:#e8d77a"></label>
-  <h3 style="margin:14px 0 6px;font-size:15px;color:#e8d77a">Phím điều khiển <span style="font-weight:400;font-size:12px;opacity:.6">(bấm vào phím để đổi, Esc để hủy)</span></h3>
+  <label class="srow">Độ nhạy chuột <input type="range" id="sSens" min="20" max="300"></label>  <h3 style="margin:14px 0 6px;font-size:15px;color:#e8d77a">Phím điều khiển <span style="font-weight:400;font-size:12px;opacity:.6">(bấm vào phím để đổi, Esc để hủy)</span></h3>
   <div id="kbList"></div>
   <div style="margin-top:12px"><button id="kbReset" style="background:#2a281d">Phím mặc định</button> <button id="setClose">Đóng</button></div>
 </div></div>
-<div id="osd" class="hidden"><div class="tl">▶ PLAY<br><span style="font-size:22px">SP</span></div><div class="br">MAY 12 1996<br><span id="osdTime"></span></div></div>
 <div id="grain"></div><div id="vig"></div><div id="hurt"></div><div id="cross"></div>
 <div id="hud"></div><div id="center"></div><div id="toast"></div>
 
 <script type="module">
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Peer } from 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm';
 
 const $ = id => document.getElementById(id);
@@ -294,51 +282,14 @@ document.body.prepend(renderer.domElement);
 // pale yellow haze instead of darkness: distance fades into dusty air, not into black
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x0b0904);scene.fog=new THREE.FogExp2(0x0b0904,.07);
 const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,80);camera.rotation.order='YXZ';scene.add(camera);
-// ---------- VHS / camcorder post-processing (found-footage look) ----------
-// order: scene -> tone mapping + sRGB (OutputPass) -> VHS pass, so the tape effects work on display colours
-const VHS={
-  uniforms:{tDiffuse:{value:null},time:{value:0},res:{value:new THREE.Vector2(innerWidth,innerHeight)}},
-  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-  fragmentShader:`uniform sampler2D tDiffuse;uniform float time;uniform vec2 res;varying vec2 vUv;
-  const vec3 W=vec3(.299,.587,.114);
-  float rnd(vec2 c){return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);}
-  float vn(float x){float i=floor(x);return mix(rnd(vec2(i,0.)),rnd(vec2(i+1.,0.)),smoothstep(0.,1.,fract(x)));}
-  vec3 tap(vec2 p){return texture2D(tDiffuse,p).rgb;}
-  void main(){
-    vec2 cc=vUv-.5;float r2=dot(cc,cc);vec2 uv=.5+cc*(1.+.05*r2);                       // slight lens/CRT barrel
-    uv.y+=step(.97,rnd(vec2(floor(time*4.),7.)))*(rnd(vec2(floor(time*24.),1.))-.5)*.006; // occasional vertical frame jitter
-    uv.x+=(vn(uv.y*8.+time*2.)-.5)*.0025;                                                // tape stretch: lines waver together
-    float band=step(.993,rnd(vec2(floor(time*6.),floor(uv.y*30.))));                    // rare tracking tears
-    uv.x+=band*.012*(rnd(vec2(time,uv.y))-.5);
-    float hs=smoothstep(.05,.0,uv.y);                                                    // head-switching noise along the bottom edge
-    uv.x+=hs*(.015+.03*rnd(vec2(floor(time*30.),floor(uv.y*200.))));
-    float px=1./res.x;                                                                   // VHS is soft: ~240 lines of luma resolution
-    vec3 soft=tap(uv)*.36+(tap(uv+vec2(px*1.5,0.))+tap(uv-vec2(px*1.5,0.)))*.22+(tap(uv+vec2(px*3.,0.))+tap(uv-vec2(px*3.,0.)))*.1;
-    float ca=.0015+.005*r2;                                                              // colour is even softer and lags to the right
-    vec3 cr=vec3(tap(uv+vec2(ca+.002,0.)).r,tap(uv+vec2(.002,0.)).g,tap(uv-vec2(ca-.002,0.)).b);
-    vec3 cb=(tap(uv+vec2(.006,0.))+tap(uv-vec2(.002,0.))+cr)/3.;
-    float l=dot(soft,W);vec3 col=l+(cb-dot(cb,W));
-    col+=(l-dot(tap(uv+vec2(px*4.,0.)),W))*.25;                                          // edge-enhancement halo of old decks
-    col+=dot(tap(uv-vec2(.012,0.)),W)*.06;                                               // faint ghost image
-    col*=.94+.06*sin(uv.y*res.y*3.14159);                                                // scanlines
-    col+=(rnd(uv*res+fract(time)*100.)-.5)*.075;                                         // tape grain
-    col+=step(.9985,rnd(vec2(floor(uv.y*res.y*.5),floor(time*24.))))*rnd(vec2(uv.x*3.,time))*.35; // white dropout streaks
-    col+=band*.08+hs*(rnd(uv*res+time)-.3)*.4;
-    col*=1.+(vn(time*9.)-.5)*.04;                                                        // brightness flicker
-    col=mix(vec3(dot(col,W)),col,.93)*.95+.02;                                           // a bit washed out, blacks lifted slightly
-    col*=1.-r2*1.1;                                                                      // vignette
-    if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)col=vec3(0.);
-    gl_FragColor=vec4(col,1.);
-  }`
-};
-const composer=new EffectComposer(renderer),vhsPass=new ShaderPass(VHS);
-composer.addPass(new RenderPass(scene,camera));composer.addPass(new OutputPass());composer.addPass(vhsPass);
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
-  composer.setSize(innerWidth,innerHeight);vhsPass.uniforms.res.value.set(innerWidth,innerHeight)});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 // dark level: near-zero ambient (set per role in startGame), small baked pools under every fixture,
 // plus real lights on the fixtures nearest you so walls light up too; fog hides the swap at distance
 const hemi=new THREE.HemisphereLight(0xffefc0,0x7a6a3a,.1);scene.add(hemi);
-const pool=[...Array(8)].map(()=>{const l=new THREE.PointLight(0xfff0c8,0,3.5,2);scene.add(l);return l});
+// the 4 nearest fixtures get shadow-casting lights (walls and pillars really block them); 4 more without
+// shadows are only used for fixtures whose light reaches the room you stand in, so they can't leak through walls
+const pool=[...Array(8)].map((_,i)=>{const l=new THREE.PointLight(0xfff0c8,0,5.5,2);
+  if(i<4){l.castShadow=true;l.shadow.mapSize.set(256,256);l.shadow.camera.near=.1;l.shadow.bias=-.004}scene.add(l);return l});
 const flash=new THREE.SpotLight(0xffd9a0,0,26,.5,.45,1.4); // warm incandescent beam, not LED white
 flash.castShadow=true;flash.shadow.mapSize.set(1024,1024);flash.shadow.camera.near=.1;
 // held at the hip, aimed so the beam converges on the crosshair
@@ -351,12 +302,28 @@ const fixMat=new THREE.MeshBasicMaterial({map:fixTex});
 const WHITE=new THREE.Color(0xfffbe8),RED=new THREE.Color(0xff2a18),OFF=new THREE.Color(0x5a5446),tmpC=new THREE.Color();
 const fixColor=(f,lvl)=>tmpC.copy(f.on||f.flick?f.red?RED:WHITE:OFF).multiplyScalar(f.on||f.flick?lvl:1);
 let fixMesh,redLights=[];
-// one canvas painted with a glow under every fixture, used as the floor/ceiling lightMap
+// cells a fixture's light can reach: flood from its cell through openings only, so light stops at walls
+function lightReach(M,L,steps){
+  const ci=Math.floor(L.p[0]/C),cj=Math.floor(L.p[1]/C),seen=new Set([ci+','+cj]);let fr=[[ci,cj]];
+  const open=(i,j,a,b)=>a>i?!M.v[j][a]:a<i?!M.v[j][i]:b>j?!M.h[b][i]:!M.h[j][i];
+  for(let d=0;d<steps;d++){const nx=[];
+    for(const [i,j] of fr)for(const [a,b] of [[i+1,j],[i-1,j],[i,j+1],[i,j-1]])
+      if(a>=0&&b>=0&&a<N&&b<N&&!seen.has(a+','+b)&&open(i,j,a,b)){seen.add(a+','+b);nx.push([a,b])}
+    fr=nx}
+  return seen;
+}
+// one canvas painted with a glow under every fixture, used as the floor/ceiling lightMap;
+// each glow is clipped to the cells its light can actually reach (no light bleeding through walls)
 function bakeLight(M){
   const P=1024,k=P/S,o=mid-S/2,c=document.createElement('canvas');c.width=c.height=P;const g=c.getContext('2d');
   g.fillStyle='#000';g.fillRect(0,0,P,P);g.globalCompositeOperation='lighter';
-  for(const L of M.lights){if(!L.on&&!L.flick)continue;const x=(L.p[0]+.5-o)*k,y=(L.p[1]-o)*k,r=(L.red?4:2.6)*k,gr=g.createRadialGradient(x,y,0,x,y,r);
-    gr.addColorStop(0,L.red?'rgba(255,30,15,.9)':'rgba(255,232,180,.85)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r)}
+  for(const L of M.lights){
+    L.reach=lightReach(M,L,2);if(!L.on&&!L.flick)continue;
+    const x=(L.p[0]+.5-o)*k,y=(L.p[1]-o)*k,r=(L.red?4.5:3.4)*k,gr=g.createRadialGradient(x,y,0,x,y,r);
+    gr.addColorStop(0,L.red?'rgba(255,30,15,.9)':'rgba(255,232,180,.9)');gr.addColorStop(.45,L.red?'rgba(160,15,8,.45)':'rgba(200,175,120,.4)');gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.save();g.beginPath();for(const key of L.reach){const [i,j]=key.split(',').map(Number);g.rect((i*C-o)*k-1,(j*C-o)*k-1,C*k+2,C*k+2)}
+    g.clip();g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r);g.restore();
+  }
   const floor=new THREE.CanvasTexture(c),ceil=floor.clone();floor.channel=ceil.channel=0;
   ceil.repeat.set(1,-1);ceil.offset.set(0,1); // the ceiling plane is flipped in z
   return [floor,ceil];
@@ -372,7 +339,8 @@ const capMat=new THREE.MeshStandardMaterial({color:0x2d5fa8,roughness:.5});
 const alarmMark=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,40,8),new THREE.MeshBasicMaterial({color:0xff2020,transparent:true,opacity:.6,depthTest:false,fog:false}));
 alarmMark.renderOrder=999;alarmMark.visible=false;scene.add(alarmMark);
 const dust=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute([...Array(1200)].map((_,i)=>i%3===1?Math.random()*WH:(Math.random()-.5)*12+mid),3)),
-  new THREE.PointsMaterial({color:0xfff4d0,size:.012,transparent:true,opacity:.5,depthWrite:false}));scene.add(dust);
+  new THREE.PointsMaterial({color:0xfff4d0,size:.014,transparent:true,opacity:.55,depthWrite:false}));scene.add(dust);
+const dustVel=[...Array(400)].map(()=>[(Math.random()-.5)*.08,.04+Math.random()*.1,(Math.random()-.5)*.08]); // m/s: drift x, fall, drift z
 
 function buildWorld(M){
   if(world)scene.remove(world);world=new THREE.Group();scene.add(world);
@@ -617,9 +585,9 @@ $('againBtn').onclick=()=>lobbyBroadcast();
 const DEF_KB={fwd:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',crouch:'KeyC',use:'KeyE',light:'KeyF',inv:'Tab',check:'Space'};
 const KB_LABEL={fwd:'Đi tới',back:'Lùi',left:'Sang trái',right:'Sang phải',sprint:'Chạy (Spectator: bay xuống)',crouch:'Cúi / bò',
   use:'Tương tác (sửa, cứu, nhặt)',light:'Bật/tắt đèn pin',inv:'Túi đồ',check:'Skill check (Spectator: bay lên)'};
-const CFG={v:2,vol:.52,sens:1,vhs:true,kb:{...DEF_KB}};
+const CFG={v:2,vol:.52,sens:1,kb:{...DEF_KB}};
 try{const s=JSON.parse(localStorage.getItem('bkrm-cfg')||'null'); // storage may be blocked
-  if(s){CFG.sens=s.sens??1;CFG.vhs=s.vhs??true;CFG.kb={...DEF_KB,...s.kb};if(s.v===2)CFG.vol=s.vol}}catch{} // v1 saves keep keys/mouse, take the new quieter volume
+  if(s){CFG.sens=s.sens??1;CFG.kb={...DEF_KB,...s.kb};if(s.v===2)CFG.vol=s.vol}}catch{} // v1 saves keep keys/mouse, take the new quieter volume
 const saveCfg=()=>{try{localStorage.setItem('bkrm-cfg',JSON.stringify(CFG))}catch{}};
 const keyName=c=>({ShiftLeft:'Shift',ShiftRight:'Shift phải',ControlLeft:'Ctrl',AltLeft:'Alt',Space:'Space',Tab:'Tab',CapsLock:'Caps'}[c]||c.replace(/^Key|^Digit|^Numpad/,''));
 const KN=a=>esc(keyName(CFG.kb[a]));
@@ -634,14 +602,12 @@ function renderKb(){
 }
 function openSettings(open){
   $('set').classList.toggle('hidden',!open);rebinding=null;
-  if(open){document.exitPointerLock?.();$('sVol').value=CFG.vol*100;$('sSens').value=CFG.sens*100;$('sVhs').checked=CFG.vhs;renderKb()}
+  if(open){document.exitPointerLock?.();$('sVol').value=CFG.vol*100;$('sSens').value=CFG.sens*100;renderKb()}
 }
 const applyAudio=()=>{if(AC){OUT.gain.value=CFG.vol;HUM.gain.value=.016}}; // hum fixed, 35% under the old default
 $('gear').onclick=()=>openSettings(true);$('setClose').onclick=()=>openSettings(false);
 $('sVol').oninput=e=>{CFG.vol=e.target.value/100;applyAudio();saveCfg()};
-$('sSens').oninput=e=>{CFG.sens=e.target.value/100;saveCfg()};
-$('sVhs').onchange=e=>{CFG.vhs=e.target.checked;saveCfg()};
-$('kbReset').onclick=()=>{CFG.kb={...DEF_KB};saveCfg();renderKb()};
+$('sSens').oninput=e=>{CFG.sens=e.target.value/100;saveCfg()};$('kbReset').onclick=()=>{CFG.kb={...DEF_KB};saveCfg();renderKb()};
 document.addEventListener('pointerlockchange',()=>$('gear').classList.toggle('hidden',locked()));
 
 // ---------- input ----------
@@ -886,13 +852,16 @@ function updateLights(dt){
   let ch=false;
   for(const f of fixtures)if(f.flick&&(f.tm-=dt)<=0){f.lvl=Math.random()<.3?.1:1;f.tm=f.lvl<1?.05+Math.random()*.15:.2+Math.random()*2.5;fixMesh.setColorAt(f.k,fixColor(f,f.lvl));ch=true}
   if(ch)fixMesh.instanceColor.needsUpdate=true;
-  const near=fixtures.filter(f=>(f.on||f.flick)&&!f.red).map(f=>[f,(f.p[0]-me.x)**2+(f.p[1]-me.z)**2]).sort((a,b)=>a[1]-b[1]);
-  pool.forEach((l,i)=>{const e=near[i];if(e){l.position.set(e[0].p[0]+.5,WH-.3,e[0].p[1]);l.intensity=3.5*e[0].lvl}else l.intensity=0});
+  const near=fixtures.filter(f=>(f.on||f.flick)&&!f.red).map(f=>[f,(f.p[0]-camera.position.x)**2+(f.p[1]-camera.position.z)**2]).sort((a,b)=>a[1]-b[1]);
+  const here=Math.floor(camera.position.x/C)+','+Math.floor(camera.position.z/C);
+  const pick=[...near.slice(0,4),...near.slice(4).filter(e=>e[0].reach.has(here)).slice(0,4)];
+  pool.forEach((l,i)=>{const e=pick[i];if(e){l.position.set(e[0].p[0]+.5,WH-.25,e[0].p[1]);l.intensity=5*e[0].lvl}else l.intensity=0});
   if(glow)glow.visible=G.exitOpen;
   if(alarmMark.visible&&(G.markT-=dt)<=0)alarmMark.visible=false;
-  // dust motes drifting around the camera, wrapped into a 12m box
-  const a=dust.geometry.attributes.position.array;
-  for(let i=0;i<a.length;i+=3){a[i]+=Math.sin(i+performance.now()*.0003)*dt*.05;a[i+1]-=dt*.02;
+  // dust motes: each has its own slow fall + a swirling drift, wrapped into a 12m box around the camera
+  const a=dust.geometry.attributes.position.array,t=performance.now()*.001;
+  for(let i=0,n=0;i<a.length;i+=3,n++){const v=dustVel[n];
+    a[i]+=(v[0]+Math.sin(t*.7+n)*.06)*dt;a[i+1]-=v[1]*dt;a[i+2]+=(v[2]+Math.cos(t*.6+n*1.3)*.06)*dt;
     for(const [k,c] of [[0,camera.position.x],[2,camera.position.z]])if(Math.abs(a[i+k]-c)>6)a[i+k]=c+(Math.random()-.5)*12;if(a[i+1]<0)a[i+1]=WH}
   dust.geometry.attributes.position.needsUpdate=true;
 }
@@ -945,14 +914,7 @@ const clock=new THREE.Clock();
   else{$('hud').innerHTML='';$('center').innerHTML=''}
   if((toastT-=dt)<=0)$('toast').textContent='';
   grainEl.style.backgroundPosition=`${Math.random()*200|0}px ${Math.random()*200|0}px`;
-  const vhs=CFG.vhs&&G.phase!=='lobby';
-  grainEl.style.display=vhs?'none':'';$('osd').classList.toggle('hidden',!vhs);
-  if(vhs){
-    vhsPass.uniforms.time.value=performance.now()/1000;composer.render();
-    const s=(performance.now()/1000|0)+(10*3600+42*60),hh=(s/3600|0)%12||12,mm=(s/60|0)%60,ss=s%60,p=v=>String(v).padStart(2,'0');
-    $('osdTime').textContent=`${(s/3600|0)%24<12?'AM':'PM'} ${hh}:${p(mm)}:${p(ss)}`; // camcorder clock, starts at 10:42 AM
-  }else renderer.render(scene,camera);
-  requestAnimationFrame(frame);
+  renderer.render(scene,camera);requestAnimationFrame(frame);
 })();
 
 // ---------- self-check: open index.html#test and read the console ----------
