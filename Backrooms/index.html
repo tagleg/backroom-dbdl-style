@@ -1165,10 +1165,16 @@ $('copyLink').onclick=async()=>{
 {const r=new URLSearchParams(location.search).get('room');
   if(r&&/^[A-Z0-9]{5}$/i.test(r)){$('code').value=r.toUpperCase();$('msg').style.color='#e8d77a';
     $('msg').textContent='Bạn được mời vào phòng '+r.toUpperCase()+' — nhập tên rồi bấm "Vào phòng".';$('name').focus()}}
+// players on different networks often can't link directly (4G, carrier NAT), so WebRTC falls back to relaying through
+// a TURN server. PeerJS's own free one is dead; this is the Metered free tier (account backrooms-tagleg, 500 MB/month).
+// The credential is public in the page by necessity: worst case someone burns the free quota, then only cross-network play breaks.
+const RELAY={username:'e07241262509f7010002b8d2',credential:'LTVELjLJXWi0nSmu'};
+const PEER_OPTS={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.relay.metered.ca:80'},
+  {urls:['turn:global.relay.metered.ca:80','turn:global.relay.metered.ca:80?transport=tcp','turn:global.relay.metered.ca:443','turns:global.relay.metered.ca:443?transport=tcp'],...RELAY}]}};
 $('hostBtn').onclick=()=>{
   audio();const name=nameVal(),code=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.random()*32|0]).join('');
   G.isHost=true;H={players:new Map(),play:false};
-  peer=new Peer('bkrm-'+code);$('msg').textContent='Đang tạo phòng…';
+  peer=new Peer('bkrm-'+code,PEER_OPTS);$('msg').textContent='Đang tạo phòng…';
   peer.on('open',id=>{G.me=id;$('msg').textContent='';showRoom(code);onHostMsg(id,{t:'hello',name})});
   peer.on('connection',c=>{
     c.on('open',()=>conns.set(c.peer,c));c.on('data',m=>onHostMsg(c.peer,m));
@@ -1187,14 +1193,17 @@ $('soloBtn').onclick=()=>{
 $('joinBtn').onclick=()=>{
   audio();const code=$('code').value.trim().toUpperCase(),name=nameVal();
   if(code.length!==5){$('msg').textContent='Mã phòng gồm 5 ký tự.';return}
-  peer=new Peer();$('msg').textContent='Đang kết nối…';
+  peer=new Peer(PEER_OPTS);$('msg').textContent='Đang kết nối…';
+  // a peer-to-peer link that can't get through (different networks, no relay) never errors, it just hangs: say so
+  const slow=setTimeout(()=>{if(!conn?.open)$('msg').textContent='Chưa kết nối được tới chủ phòng. Kiểm tra mã phòng và chủ phòng phải đang ở màn hình chờ (chưa bắt đầu ván). '+
+    'Nếu vẫn không được: mạng của một trong hai người đang chặn kết nối trực tiếp — thử dùng chung một wifi.'},12000);
   peer.on('open',id=>{
     G.me=id;conn=peer.connect('bkrm-'+code,{reliable:true});
-    conn.on('open',()=>{$('msg').textContent='';conn.send({t:'hello',name});showRoom(code)});
+    conn.on('open',()=>{clearTimeout(slow);$('msg').textContent='';conn.send({t:'hello',name});showRoom(code)});
     conn.on('data',onClientMsg);
     conn.on('close',()=>{$('msg').textContent='Mất kết nối với chủ phòng. Tải lại trang để vào lại.';G.phase='lobby';$('lobby').classList.remove('hidden');document.exitPointerLock?.()});
   });
-  peer.on('error',e=>$('msg').textContent=e.type==='peer-unavailable'?'Không tìm thấy phòng.':'Lỗi: '+e.type);
+  peer.on('error',e=>{clearTimeout(slow);$('msg').textContent=e.type==='peer-unavailable'?'Không tìm thấy phòng — kiểm tra lại mã, và chủ phòng không được tắt/tải lại trang.':'Lỗi: '+e.type});
 };
 $('startBtn').onclick=()=>{if(H.players.size<1)return;hostStart()};
 $('againBtn').onclick=()=>lobbyBroadcast();
